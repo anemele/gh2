@@ -10,27 +10,50 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
-type Config struct {
+type CloneConfig struct {
+	OutputDir string   `toml:"output_dir"`
+	MirrorUrl string   `toml:"mirror_url"`
+	GitConfig []string `toml:"git_config"`
+}
+
+type DownloadConfig struct {
 	OutputDir string   `toml:"output_dir"`
 	Mirrors   []string `toml:"mirrors"`
 }
 
+type Config struct {
+	Clone    CloneConfig    `toml:"clone"`
+	Download DownloadConfig `toml:"download"`
+}
+
+func DefaultConfig() *Config {
+	return &Config{
+		Clone: CloneConfig{
+			OutputDir: ".",
+			MirrorUrl: "https://github.com/",
+			GitConfig: []string{},
+		},
+		Download: DownloadConfig{
+			OutputDir: ".",
+			Mirrors:   []string{},
+		},
+	}
+}
+
 func LoadConfig() (*Config, error) {
+	config := DefaultConfig()
+
 	homeDir, _ := os.UserHomeDir()
-	configFilePath := filepath.Join(homeDir, ".ghdlrc")
+	configFilePath := filepath.Join(homeDir, ".gh2rc")
 
 	fp, err := os.Open(configFilePath)
 	if err != nil {
 		fmt.Println("config file not found, creating default config")
 		// 如果打开文件出错，可能是不存在，则创建默认配置，并写入文件
-		config := Config{
-			OutputDir: ".",
-			Mirrors:   []string{},
-		}
 		// 尝试写入文件，如果出错则不理会，直接返回默认配置
 		fp, err = os.OpenFile(configFilePath, os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
-			return &config, nil
+			return config, nil
 		}
 		defer fp.Close()
 		// 以 TOML 格式写入文件
@@ -40,22 +63,21 @@ func LoadConfig() (*Config, error) {
 		if err != nil {
 			fmt.Println(err)
 		}
-		return &config, nil
+		return config, nil
 	}
 	defer fp.Close()
 
 	decoder := toml.NewDecoder(fp)
-	var config Config
 	_, err = decoder.Decode(&config)
 	if err != nil {
 		fmt.Println("failed to parse config file, please check it")
 		return nil, err
 	}
 
-	return &config, nil
+	return config, nil
 }
 
-const repoCacheFileName = "ghdl-repos"
+const repoCacheFileName = "gh-repos"
 
 // repo cache file format:
 // owner1/name1

@@ -1,11 +1,3 @@
-# GitHub Download
+# GitHub CLI 2
 
-Download releases from GitHub.
-
-## Usage
-
-```bash
-ghdl [repo]...
-```
-
-If no repo given, reading from the cache.
+Complement for GitHub CLI.

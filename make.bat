@@ -2,8 +2,8 @@
 
 setlocal
 
-set output=ghdl
+set output=gh2
 set dist=dist
 if not exist %dist% mkdir %dist%
 
-go build -ldflags="-s -w" -o %dist%\ghdl.exe
+go build -ldflags="-s -w" -o %dist%\%output%.exe
