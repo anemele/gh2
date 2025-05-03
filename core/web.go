@@ -40,16 +40,13 @@ func DownloadAssets(assets []Asset, dir string, proxies []Proxy) error {
 
 	var wg sync.WaitGroup
 	wg.Add(len(assets))
-	var done = make(chan struct{})
+	var done = make(chan bool)
 
 	for _, asset := range assets {
 		go func(asset Asset) {
 			defer wg.Done()
 			err := DownloadAsset(asset, dir, proxies)
-			if err != nil {
-				fmt.Println(err)
-			}
-			done <- struct{}{}
+			done <- err == nil
 		}(asset)
 	}
 
@@ -58,13 +55,18 @@ func DownloadAssets(assets []Asset, dir string, proxies []Proxy) error {
 		close(done)
 	}()
 
-	idx := 0
-	for range done {
-		idx++
-		fmt.Printf("\r [%d/%d] done", idx, len(assets))
+	succ := 0
+	fail := 0
+	for ok := range done {
+		if ok {
+			succ++
+		} else {
+			fail++
+		}
+		// \x1b[2K 控制字符：清除当前行
+		fmt.Printf("\r %d done, %d failed", succ, fail)
 	}
-	// \x1b[2K 控制字符：清除当前行
-	fmt.Printf("\r [%d/%d] all done!\n", len(assets), len(assets))
+	fmt.Println()
 
 	return nil
 }
