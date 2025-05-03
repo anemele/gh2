@@ -36,6 +36,7 @@ func main() {
 			return
 		}
 		if len(args) == 0 {
+			fmt.Println("no input")
 			return
 		}
 		args, err = core.SurveyCache(args)

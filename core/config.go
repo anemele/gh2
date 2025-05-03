@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -17,11 +17,10 @@ type Config struct {
 
 func LoadConfig() (*Config, error) {
 	homeDir, _ := os.UserHomeDir()
-	configFilePath := path.Join(homeDir, ".ghdlrc")
+	configFilePath := filepath.Join(homeDir, ".ghdlrc")
 
 	fp, err := os.Open(configFilePath)
 	if err != nil {
-		fmt.Println(err)
 		fmt.Println("config file not found, creating default config")
 		// 如果打开文件出错，可能是不存在，则创建默认配置，并写入文件
 		config := Config{
@@ -63,7 +62,7 @@ const repoCacheFileName = "ghdl-repos"
 // owner2/name2
 // ...
 func LoadRepos(dir string) ([]string, error) {
-	filename := path.Join(dir, repoCacheFileName)
+	filename := filepath.Join(dir, repoCacheFileName)
 
 	// not exists
 	if _, err := os.Stat(filename); os.IsNotExist(err) {
@@ -86,7 +85,7 @@ func LoadRepos(dir string) ([]string, error) {
 }
 
 func SaveRepos(dir string, repos []string) error {
-	filename := path.Join(dir, repoCacheFileName)
+	filename := filepath.Join(dir, repoCacheFileName)
 	fp, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return err

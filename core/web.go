@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"path"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -81,8 +81,7 @@ func DownloadAssets(assets []Asset, dir string, proxies []Proxy) error {
 const chunkSize = 1024 * 1024 * 2
 
 func DownloadAsset(asset Asset, dir string, proxies []Proxy) error {
-	filepath := path.Join(dir, asset.Name)
-	file, err := os.OpenFile(filepath, os.O_CREATE|os.O_WRONLY, 0644)
+	file, err := os.OpenFile(filepath.Join(dir, asset.Name), os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}
@@ -90,13 +89,18 @@ func DownloadAsset(asset Asset, dir string, proxies []Proxy) error {
 	url := asset.DownloadUrl
 	resp, err := client.Head(url)
 	if err != nil || resp.StatusCode != http.StatusOK {
+		fail := true
 		for _, proxy := range proxies {
 			url = proxy(url)
 			resp, err = client.Head(url)
 			if err != nil || resp.StatusCode != http.StatusOK {
 				continue
 			}
+			fail = false
 			break
+		}
+		if fail {
+			return fmt.Errorf("failed to download asset: %s", asset.Title())
 		}
 	}
 
