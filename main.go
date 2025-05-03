@@ -111,11 +111,13 @@ func main() {
 
 	// 获取代理列表
 	proxies := core.GetProxies(config.Mirrors)
+	proxy := core.TestProxies(proxies)
+
 	// 下载 assets
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err = core.DownloadAssets(allAssets, config.OutputDir, proxies)
+		err = core.DownloadAssets(allAssets, config.OutputDir, proxy)
 		if err != nil {
 			fmt.Println(err)
 		}

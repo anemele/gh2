@@ -38,7 +38,7 @@ func (repo Repo) GetReleases() ([]Release, error) {
 }
 
 // 应该并发下载，但是没有合适的 multi progressbar 库，暂且单一下载
-func DownloadAssets(assets []Asset, dir string, proxies []Proxy) error {
+func DownloadAssets(assets []Asset, dir string, proxy Proxy) error {
 	var wg sync.WaitGroup
 	wg.Add(len(assets))
 	var done = make(chan bool)
@@ -46,7 +46,7 @@ func DownloadAssets(assets []Asset, dir string, proxies []Proxy) error {
 	for _, asset := range assets {
 		go func(asset Asset) {
 			defer wg.Done()
-			err := DownloadAsset(asset, dir, proxies)
+			err := DownloadAsset(asset, dir, proxy)
 			done <- err == nil
 		}(asset)
 	}
@@ -80,31 +80,19 @@ func DownloadAssets(assets []Asset, dir string, proxies []Proxy) error {
 
 const chunkSize = 1024 * 1024 * 2
 
-func DownloadAsset(asset Asset, dir string, proxies []Proxy) error {
+func DownloadAsset(asset Asset, dir string, proxy Proxy) error {
 	file, err := os.OpenFile(filepath.Join(dir, asset.Name), os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 
 	url := asset.DownloadUrl
-	resp, err := client.Head(url)
-	if err != nil || resp.StatusCode != http.StatusOK {
-		fail := true
-		for _, proxy := range proxies {
-			url = proxy(url)
-			resp, err = client.Head(url)
-			if err != nil || resp.StatusCode != http.StatusOK {
-				continue
-			}
-			fail = false
-			break
-		}
-		if fail {
-			return fmt.Errorf("failed to download asset: %s", asset.Title())
-		}
+	if proxy != nil {
+		url = proxy(url)
 	}
 
-	start := 0
+	var start int64 = 0
 	for start < asset.Size {
 		end := start + chunkSize
 		if end >= asset.Size {

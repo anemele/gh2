@@ -53,13 +53,13 @@ type Asset struct {
 	Name        string    `json:"name"`
 	Label       string    `json:"label"`
 	ContentType string    `json:"content_type"`
-	Size        int       `json:"size"`
+	Size        int64     `json:"size"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 	DownloadUrl string    `json:"browser_download_url"`
 }
 
-func humanSize(size int) string {
+func humanSize(size int64) string {
 	if size < 1024 {
 		return fmt.Sprintf("%d B", size)
 	}
