@@ -32,10 +32,14 @@ func cloneRepo(url string, config *core.CloneConfig) error {
 		"clone", repoUrl, destDir,
 	}
 	args = append(args, config.GitConfig...)
-	fmt.Printf("Running: %s", strings.Join(args, " "))
+
 	cmd := exec.Command("git", args...)
 
-	return cmd.Run()
+	fmt.Printf("Running: %s\n", strings.Join(args, " "))
+	output, err := cmd.CombinedOutput()
+	fmt.Println(string(output))
+
+	return err
 }
 
 func cloneAction(c *cli.Context) error {
