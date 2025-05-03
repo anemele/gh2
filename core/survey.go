@@ -17,7 +17,7 @@ func SurveyReleases(repo *Repo, releases []Release) ([]Asset, error) {
 
 	// ask select releases
 	var q1 = &survey.Select{
-		Message: fmt.Sprintf("Select releases of %s:", repo.String()),
+		Message: fmt.Sprintf("Select release of %s:", repo.String()),
 		Options: releaseTitles,
 	}
 	var selectedReleaseName string
@@ -41,7 +41,7 @@ func SurveyReleases(repo *Repo, releases []Release) ([]Asset, error) {
 
 	// ask select assets
 	var q2 = &survey.MultiSelect{
-		Message: "Select assets:",
+		Message: fmt.Sprintf("Select assets (%d):", len(assetTitles)),
 		Options: assetTitles,
 	}
 	var selectedAssetNames []string

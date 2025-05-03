@@ -43,7 +43,9 @@ type Release struct {
 }
 
 func (r Release) Title() string {
-	date := r.CreatedAt.Format("2006-01-02")
+	// 这里要使用 PublishedAt 而不是 CreatedAt，因为 release 可以更新，
+	// 例如 x64dbg/x64dbg 以 snapshot 发布，它的 created_at 不会变
+	date := r.PublishedAt.Format("2006-01-02")
 	return fmt.Sprintf("%s (%s)", r.TagName, date)
 }
 
@@ -72,6 +74,7 @@ func humanSize(size int) string {
 }
 
 func (a Asset) Title() string {
+	// 这里是否改用 updated_at 更好？
 	date := a.CreatedAt.Format("2006-01-02")
 	size := humanSize(a.Size)
 	return fmt.Sprintf("%s (%s, %s)", a.Name, date, size)

@@ -102,6 +102,12 @@ func main() {
 		allAssets = append(allAssets, assets...)
 	}
 
+	// 如果没有 assets，则退出
+	if len(allAssets) == 0 {
+		fmt.Println("no assets to download")
+		return
+	}
+
 	// 获取代理列表
 	proxies := core.GetProxies(config.Mirrors)
 	// 下载 assets

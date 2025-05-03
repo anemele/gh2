@@ -7,6 +7,9 @@ import (
 	"os"
 	"path"
 	"sync"
+	"time"
+
+	"github.com/briandowns/spinner"
 )
 
 var client http.Client
@@ -36,8 +39,6 @@ func (repo Repo) GetReleases() ([]Release, error) {
 
 // 应该并发下载，但是没有合适的 multi progressbar 库，暂且单一下载
 func DownloadAssets(assets []Asset, dir string, proxies []Proxy) error {
-	fmt.Printf("Downloading %d assets...\n", len(assets))
-
 	var wg sync.WaitGroup
 	wg.Add(len(assets))
 	var done = make(chan bool)
@@ -55,8 +56,14 @@ func DownloadAssets(assets []Asset, dir string, proxies []Proxy) error {
 		close(done)
 	}()
 
+	sp := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
+	sp.Start()
+	defer sp.Stop()
+
 	succ := 0
 	fail := 0
+	sp.Prefix = fmt.Sprintf("Downloading %d assets ", len(assets))
+
 	for ok := range done {
 		if ok {
 			succ++
@@ -64,14 +71,14 @@ func DownloadAssets(assets []Asset, dir string, proxies []Proxy) error {
 			fail++
 		}
 		// \x1b[2K 控制字符：清除当前行
-		fmt.Printf("\r %d done, %d failed", succ, fail)
+		sp.Suffix = fmt.Sprintf(" Success: %d | Failure: %d", succ, fail)
 	}
-	fmt.Println()
+	sp.FinalMSG = fmt.Sprintf("All: %d | Success: %d | Failure: %d\n", len(assets), succ, fail)
 
 	return nil
 }
 
-const chunkSize = 1024 * 1024
+const chunkSize = 1024 * 1024 * 2
 
 func DownloadAsset(asset Asset, dir string, proxies []Proxy) error {
 	filepath := path.Join(dir, asset.Name)
