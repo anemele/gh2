@@ -16,7 +16,6 @@ func (r *Repo) String() string {
 	return fmt.Sprintf("%s/%s", r.Owner, r.Name)
 }
 
-// 该解析函数很简单，只是按照斜线分割，后续应该优化
 func ParseRepo(s string) *Repo {
 	pattern1 := regexp.MustCompile(`^(?:https://[\w\.\-]+/)|(?:git@[\w\.\-]+:)`)
 

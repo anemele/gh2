@@ -13,6 +13,6 @@ var configCommand = &cli.Command{
 }
 
 func configAction(c *cli.Context) error {
-	fmt.Println("Config command")
+	fmt.Println("TODO: config command")
 	return nil
 }
