@@ -14,7 +14,7 @@ import (
 
 var client http.Client
 
-func (repo Repo) GetReleases() ([]Release, error) {
+func (repo *Repo) GetReleases() ([]Release, error) {
 	url := getReleasesUrl(repo)
 	resp, err := client.Get(url)
 

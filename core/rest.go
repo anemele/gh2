@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -11,23 +12,43 @@ type Repo struct {
 	Name  string
 }
 
-func (r Repo) String() string {
+func (r *Repo) String() string {
 	return fmt.Sprintf("%s/%s", r.Owner, r.Name)
 }
 
 // 该解析函数很简单，只是按照斜线分割，后续应该优化
-func ParseRepo(s string) (*Repo, error) {
-	ss := strings.Split(s, "/")
-	if len(ss) != 2 {
-		return nil, fmt.Errorf("invalid repo: %s", s)
+func ParseRepo(s string) *Repo {
+	pattern1 := regexp.MustCompile(`^(?:https://[\w\.\-]+/)|(?:git@[\w\.\-]+:)`)
+
+	i := pattern1.FindStringIndex(s)
+	if i != nil {
+		s = s[i[1]:]
 	}
+
+	s = strings.TrimPrefix(s, "/")
+
+	pattern2 := regexp.MustCompile(`^([\w-]+)/([\w\.-]+)`)
+
+	i = pattern2.FindStringIndex(s)
+	if i == nil {
+		return nil
+	}
+
+	matches := pattern2.FindStringSubmatch(s)
+	owner := matches[1]
+	name := matches[2]
+	grp0 := matches[0]
+	if len(grp0) == len(s) || (len(s) > len(grp0) && s[len(grp0)] != '/') {
+		name = strings.TrimSuffix(name, ".git")
+	}
+
 	return &Repo{
-		Owner: ss[0],
-		Name:  ss[1],
-	}, nil
+		Owner: owner,
+		Name:  name,
+	}
 }
 
-func getReleasesUrl(repo Repo) string {
+func getReleasesUrl(repo *Repo) string {
 	return fmt.Sprintf("https://api.github.com/repos/%s/releases", repo.String())
 }
 
@@ -42,7 +63,7 @@ type Release struct {
 	Assets      []Asset   `json:"assets"`
 }
 
-func (r Release) Title() string {
+func (r *Release) Title() string {
 	// 这里要使用 PublishedAt 而不是 CreatedAt，因为 release 可以更新，
 	// 例如 x64dbg/x64dbg 以 snapshot 发布，它的 created_at 不会变
 	date := r.PublishedAt.Format("2006-01-02")

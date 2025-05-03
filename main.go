@@ -49,12 +49,10 @@ func main() {
 	// 解析输入数组，生成仓库数组
 	var repos []*core.Repo
 	for _, arg := range args {
-		repo, err := core.ParseRepo(arg)
-		if err != nil {
-			fmt.Println(err)
-			continue
+		repo := core.ParseRepo(arg)
+		if repo != nil {
+			repos = append(repos, repo)
 		}
-		repos = append(repos, repo)
 	}
 	// 如果没有仓库，则退出
 	if len(repos) == 0 {
