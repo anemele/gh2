@@ -37,18 +37,24 @@ func (repo *Repo) GetReleases() ([]Release, error) {
 	return releases, nil
 }
 
-// 应该并发下载，但是没有合适的 multi progressbar 库，暂且单一下载
+const workers = 10
+
 func DownloadAssets(assets []Asset, dir string, proxy Proxy) error {
 	var wg sync.WaitGroup
-	wg.Add(len(assets))
+	var sem = make(chan struct{}, workers)
 	var done = make(chan bool)
 
 	for _, asset := range assets {
-		go func(asset Asset) {
-			defer wg.Done()
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(asset Asset, wg *sync.WaitGroup, sem chan struct{}) {
+			defer func() {
+				<-sem
+				wg.Done()
+			}()
 			err := DownloadAsset(asset, dir, proxy)
 			done <- err == nil
-		}(asset)
+		}(asset, &wg, sem)
 	}
 
 	go func() {
