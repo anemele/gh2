@@ -5,6 +5,7 @@ import (
 	"gh2/core"
 	"os"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/urfave/cli/v2"
@@ -147,8 +148,10 @@ func downloadAction(c *cli.Context) error {
 		hashtable[r] = true
 	}
 
-	// 按照字母表顺序排序
-	sort.Strings(cache)
+	// 按照字母表顺序排序，忽略大小写
+	sort.Slice(cache, func(i, j int) bool {
+		return strings.ToLower(cache[i]) < strings.ToLower(cache[j])
+	})
 	err = core.SaveRepos(config.OutputDir, cache)
 
 	return err
