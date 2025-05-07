@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sync"
 	"time"
@@ -14,7 +15,24 @@ import (
 
 var client http.Client
 
-func (repo *Repo) GetReleases() ([]Release, error) {
+// GitHub REST API 请求频繁会被限流，但是携带身份请求可以提高请求频率
+// 这里加一个方法，使用 GitHub CLI 的 api 命令发送请求，获取 releases
+func getReleases_gh_api(repo *Repo) ([]Release, error) {
+	url := fmt.Sprintf("repos/%s/releases", repo.String())
+	cmd := exec.Command("gh", "api", url)
+	resp, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+	var releases []Release
+	err = json.Unmarshal(resp, &releases)
+	if err != nil {
+		return nil, err
+	}
+	return releases, nil
+}
+
+func getReleases_base(repo *Repo) ([]Release, error) {
 	url := getReleasesUrl(repo)
 	resp, err := client.Get(url)
 
@@ -35,6 +53,13 @@ func (repo *Repo) GetReleases() ([]Release, error) {
 	}
 
 	return releases, nil
+}
+
+func (repo *Repo) GetReleases() ([]Release, error) {
+	if res, err := getReleases_base(repo); err == nil {
+		return res, nil
+	}
+	return getReleases_gh_api(repo)
 }
 
 const workers = 10

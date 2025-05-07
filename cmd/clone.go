@@ -12,7 +12,7 @@ import (
 
 var cloneCommand = &cli.Command{
 	Name:      "clone",
-	Aliases:   []string{"cl", "c"},
+	Aliases:   []string{"cl"},
 	Usage:     "Clone repository from GitHub",
 	UsageText: "gh2 clone [repo] ...",
 	Args:      true,

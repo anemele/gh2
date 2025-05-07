@@ -13,7 +13,7 @@ import (
 
 var downloadCommand = &cli.Command{
 	Name:      "download",
-	Aliases:   []string{"dl", "d"},
+	Aliases:   []string{"dl"},
 	Usage:     "Download releases from GitHub",
 	UsageText: "gh2 download [repo] ...",
 	Args:      true,
@@ -70,6 +70,7 @@ func downloadAction(c *cli.Context) error {
 	var wg sync.WaitGroup
 
 	type Pair struct {
+		err      error
 		repo     *core.Repo
 		releases []core.Release
 	}
@@ -80,10 +81,7 @@ func downloadAction(c *cli.Context) error {
 		go func(repo *core.Repo) {
 			defer wg.Done()
 			releases, err := repo.GetReleases()
-			if err != nil {
-				return
-			}
-			pairChan <- Pair{repo, releases}
+			pairChan <- Pair{err, repo, releases}
 		}(repo)
 	}
 
@@ -98,6 +96,10 @@ func downloadAction(c *cli.Context) error {
 	// 交互选取 assets
 	var allAssets []core.Asset
 	for pair := range pairChan {
+		if pair.err != nil {
+			fmt.Printf("Error on %s: %s\n", pair.repo.String(), pair.err)
+			continue
+		}
 		repos = append(repos, pair.repo)
 		assets, err := core.SurveyReleases(pair.repo, pair.releases)
 		if err != nil {
