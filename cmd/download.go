@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"gh2/core"
 	"os"
-	"sort"
-	"strings"
 	"sync"
 
 	"github.com/urfave/cli/v2"
@@ -55,10 +53,10 @@ func downloadAction(c *cli.Context) error {
 	}
 
 	// 解析输入数组，生成仓库数组
-	var repos []*core.Repo
+	var repos []core.Repo
 	for _, arg := range args {
-		repo := core.ParseRepo(arg)
-		if repo != nil {
+		repo, err := core.ParseRepo(arg)
+		if err == nil {
 			repos = append(repos, repo)
 		}
 	}
@@ -71,14 +69,14 @@ func downloadAction(c *cli.Context) error {
 
 	type Pair struct {
 		err      error
-		repo     *core.Repo
+		repo     core.Repo
 		releases []core.Release
 	}
 	// 首先获取所有仓库的 releases
 	pairChan := make(chan Pair, len(repos))
 	wg.Add(len(repos))
 	for _, repo := range repos {
-		go func(repo *core.Repo) {
+		go func(repo core.Repo) {
 			defer wg.Done()
 			releases, err := repo.GetReleases()
 			pairChan <- Pair{err, repo, releases}
@@ -92,7 +90,7 @@ func downloadAction(c *cli.Context) error {
 	// }()
 
 	// 清空 repos 数组，因为可能部分错误，或者404等
-	repos = []*core.Repo{}
+	repos = []core.Repo{}
 	// 交互选取 assets
 	var allAssets []core.Asset
 	for pair := range pairChan {
@@ -128,32 +126,10 @@ func downloadAction(c *cli.Context) error {
 	}()
 	wg.Wait()
 
-	// 更新缓存
-	cache, err := core.LoadRepos(config.OutputDir)
-	// 这里一般不会返回 err ，如果返回 err 则直接退出
+	cache, err := core.UpdateRepos(config.OutputDir, repos)
 	if err != nil {
 		return err
 	}
-
-	// 使用哈希表去重（用 set 更合适，但是没有标准库支持）
-	hashtable := make(map[string]bool)
-	for _, repo := range cache {
-		hashtable[repo] = true
-	}
-
-	for _, repo := range repos {
-		r := repo.String()
-		if hashtable[r] {
-			continue
-		}
-		cache = append(cache, r)
-		hashtable[r] = true
-	}
-
-	// 按照字母表顺序排序，忽略大小写
-	sort.Slice(cache, func(i, j int) bool {
-		return strings.ToLower(cache[i]) < strings.ToLower(cache[j])
-	})
 	err = core.SaveRepos(config.OutputDir, cache)
 
 	return err

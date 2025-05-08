@@ -6,7 +6,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 )
 
-func SurveyReleases(repo *Repo, releases []Release) ([]Asset, error) {
+func SurveyReleases(repo Repo, releases []Release) ([]Asset, error) {
 	var releaseTitles []string
 	var releaseTitleMap = make(map[string]Release)
 	for _, release := range releases {

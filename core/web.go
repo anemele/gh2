@@ -17,7 +17,7 @@ var client http.Client
 
 // GitHub REST API 请求频繁会被限流，但是携带身份请求可以提高请求频率
 // 这里加一个方法，使用 GitHub CLI 的 api 命令发送请求，获取 releases
-func getReleases_gh_api(repo *Repo) ([]Release, error) {
+func getReleases_gh_api(repo Repo) ([]Release, error) {
 	url := fmt.Sprintf("repos/%s/releases", repo.String())
 	cmd := exec.Command("gh", "api", url)
 	resp, err := cmd.Output()
@@ -32,7 +32,7 @@ func getReleases_gh_api(repo *Repo) ([]Release, error) {
 	return releases, nil
 }
 
-func getReleases_base(repo *Repo) ([]Release, error) {
+func getReleases_base(repo Repo) ([]Release, error) {
 	url := getReleasesUrl(repo)
 	resp, err := client.Get(url)
 
@@ -55,7 +55,7 @@ func getReleases_base(repo *Repo) ([]Release, error) {
 	return releases, nil
 }
 
-func (repo *Repo) GetReleases() ([]Release, error) {
+func (repo Repo) GetReleases() ([]Release, error) {
 	if res, err := getReleases_base(repo); err == nil {
 		return res, nil
 	}
@@ -66,20 +66,21 @@ const workers = 10
 
 func DownloadAssets(assets []Asset, dir string, proxy Proxy) error {
 	var wg sync.WaitGroup
-	var sem = make(chan struct{}, workers)
+	type empty struct{}
+	var sem = make(chan empty, workers)
 	var done = make(chan bool)
 
 	for _, asset := range assets {
 		wg.Add(1)
-		sem <- struct{}{}
-		go func(asset Asset, wg *sync.WaitGroup, sem chan struct{}) {
+		sem <- empty{}
+		go func(asset Asset, sem chan empty) {
 			defer func() {
 				<-sem
 				wg.Done()
 			}()
 			err := DownloadAsset(asset, dir, proxy)
 			done <- err == nil
-		}(asset, &wg, sem)
+		}(asset, sem)
 	}
 
 	go func() {

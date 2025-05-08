@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -26,8 +27,8 @@ type Config struct {
 	Download DownloadConfig `toml:"download"`
 }
 
-func DefaultConfig() *Config {
-	return &Config{
+func DefaultConfig() Config {
+	return Config{
 		Clone: CloneConfig{
 			OutputDir: ".",
 			MirrorUrl: "https://github.com/",
@@ -40,7 +41,7 @@ func DefaultConfig() *Config {
 	}
 }
 
-func LoadConfig() (*Config, error) {
+func LoadConfig() (Config, error) {
 	config := DefaultConfig()
 
 	homeDir, _ := os.UserHomeDir()
@@ -71,7 +72,7 @@ func LoadConfig() (*Config, error) {
 	_, err = decoder.Decode(&config)
 	if err != nil {
 		fmt.Println("failed to parse config file, please check it")
-		return nil, err
+		return DefaultConfig(), err
 	}
 
 	return config, nil
@@ -104,6 +105,38 @@ func LoadRepos(dir string) ([]string, error) {
 	}
 	repos := strings.Split(string(buf), "\n")
 	return repos, nil
+}
+
+func UpdateRepos(dir string, repos []Repo) ([]string, error) {
+	cache, err := LoadRepos(dir)
+	// 这里一般不会返回 err ，如果返回 err 则直接退出
+	if err != nil {
+		return nil, err
+	}
+
+	// 使用哈希表去重（用 set 更合适，但是没有标准库支持）
+	type empty struct{}
+	hashtable := make(map[string]empty)
+	for _, repo := range cache {
+		hashtable[repo] = empty{}
+	}
+
+	for _, repo := range repos {
+		r := repo.String()
+		_, ok := hashtable[r]
+		if ok {
+			continue
+		}
+		cache = append(cache, r)
+		hashtable[r] = empty{}
+	}
+
+	// 按照字母表顺序排序，忽略大小写
+	sort.Slice(cache, func(i, j int) bool {
+		return strings.ToLower(cache[i]) < strings.ToLower(cache[j])
+	})
+
+	return cache, nil
 }
 
 func SaveRepos(dir string, repos []string) error {

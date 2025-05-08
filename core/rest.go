@@ -12,11 +12,11 @@ type Repo struct {
 	Name  string
 }
 
-func (r *Repo) String() string {
+func (r Repo) String() string {
 	return fmt.Sprintf("%s/%s", r.Owner, r.Name)
 }
 
-func ParseRepo(s string) *Repo {
+func ParseRepo(s string) (Repo, error) {
 	pattern1 := regexp.MustCompile(`^(?:https://[\w\.\-]+/)|(?:git@[\w\.\-]+:)`)
 
 	i := pattern1.FindStringIndex(s)
@@ -30,7 +30,7 @@ func ParseRepo(s string) *Repo {
 
 	i = pattern2.FindStringIndex(s)
 	if i == nil {
-		return nil
+		return Repo{}, fmt.Errorf("invalid repo: %s", s)
 	}
 
 	matches := pattern2.FindStringSubmatch(s)
@@ -41,13 +41,13 @@ func ParseRepo(s string) *Repo {
 		name = strings.TrimSuffix(name, ".git")
 	}
 
-	return &Repo{
+	return Repo{
 		Owner: owner,
 		Name:  name,
-	}
+	}, nil
 }
 
-func getReleasesUrl(repo *Repo) string {
+func getReleasesUrl(repo Repo) string {
 	return fmt.Sprintf("https://api.github.com/repos/%s/releases", repo.String())
 }
 
@@ -62,7 +62,7 @@ type Release struct {
 	Assets      []Asset   `json:"assets"`
 }
 
-func (r *Release) Title() string {
+func (r Release) Title() string {
 	// 这里要使用 PublishedAt 而不是 CreatedAt，因为 release 可以更新，
 	// 例如 x64dbg/x64dbg 以 snapshot 发布，它的 created_at 不会变
 	date := r.PublishedAt.Format("2006-01-02")

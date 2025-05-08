@@ -21,10 +21,10 @@ var cloneCommand = &cli.Command{
 	Action:    cloneAction,
 }
 
-func cloneRepo(url string, config *core.CloneConfig) error {
-	repo := core.ParseRepo(url)
-	if repo == nil {
-		return fmt.Errorf("invalid url: %s", url)
+func cloneRepo(url string, config core.CloneConfig) error {
+	repo, err := core.ParseRepo(url)
+	if err != nil {
+		return err
 	}
 
 	repoUrl := fmt.Sprintf("%s%s.git", config.MirrorUrl, repo.String())
@@ -47,7 +47,7 @@ func cloneRepo(url string, config *core.CloneConfig) error {
 	cmd.Stdout = io.Writer(os.Stdout)
 	cmd.Stderr = io.Writer(os.Stderr)
 
-	err := cmd.Run()
+	err = cmd.Run()
 
 	return err
 }
@@ -65,7 +65,7 @@ func cloneAction(c *cli.Context) error {
 	}
 
 	for _, arg := range c.Args().Slice() {
-		err = cloneRepo(arg, &config)
+		err = cloneRepo(arg, config)
 		if err != nil {
 			fmt.Println(err)
 		}

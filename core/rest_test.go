@@ -7,8 +7,8 @@ import (
 )
 
 func f(url string) string {
-	repo := ParseRepo(url)
-	if repo == nil {
+	repo, err := ParseRepo(url)
+	if err != nil {
 		return ""
 	}
 	return repo.String()
