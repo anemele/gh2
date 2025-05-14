@@ -4,28 +4,22 @@ import (
 	"fmt"
 	"gh2/core"
 	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
-
-	"github.com/urfave/cli/v2"
 )
 
-var cloneCommand = &cli.Command{
-	Name:      "clone",
-	Aliases:   []string{"cl"},
-	Usage:     "Clone repository from GitHub",
-	UsageText: "gh2 clone [repo] ...",
-	Args:      true,
-	Action:    cloneAction,
-}
+func cloneCommand(url string, config core.CloneConfig) error {
+	slog.Debug("cloneCommand", "url", url, "config", config)
 
-func cloneRepo(url string, config core.CloneConfig) error {
 	repo, err := core.ParseRepo(url)
 	if err != nil {
 		return err
 	}
+
+	slog.Debug("cloneCommand", "repo", repo)
 
 	repoUrl := fmt.Sprintf("%s%s.git", config.MirrorUrl, repo.String())
 	destDir := filepath.Join(config.OutputDir, repo.String())
@@ -35,7 +29,7 @@ func cloneRepo(url string, config core.CloneConfig) error {
 	}
 	args = append(args, config.GitConfig...)
 
-	fmt.Println("Running: git", strings.Join(args, " "))
+	slog.Debug("cloneCommand", "cmd", "git "+strings.Join(args, " "))
 
 	cmd := exec.Command("git", args...)
 
@@ -50,26 +44,4 @@ func cloneRepo(url string, config core.CloneConfig) error {
 	err = cmd.Run()
 
 	return err
-}
-
-func cloneAction(c *cli.Context) error {
-	baseConfig, err := core.LoadConfig()
-
-	if err != nil {
-		return err
-	}
-	config := baseConfig.Clone
-
-	if c.NArg() == 0 {
-		return fmt.Errorf("required at least one repo")
-	}
-
-	for _, arg := range c.Args().Slice() {
-		err = cloneRepo(arg, config)
-		if err != nil {
-			fmt.Println(err)
-		}
-	}
-
-	return nil
 }

@@ -1,23 +1,58 @@
 package cmd
 
 import (
-	"os"
+	"fmt"
+	"gh2/core"
+	"log/slog"
 
-	"github.com/urfave/cli/v2"
+	"github.com/alecthomas/kong"
 )
 
-var app = cli.NewApp()
-
-func init() {
-	app.Name = "gh2"
-	app.Usage = "Complement for GitHub CLI."
-	app.Commands = []*cli.Command{
-		cloneCommand,
-		downloadCommand,
-		configCommand,
-	}
+var CLI struct {
+	Debug bool `help:"Enable debug mode." hidden:""`
+	Clone struct {
+		Repo []string `arg:"" required:""`
+	} `cmd:"" aliases:"cl" help:"Clone repository from GitHub"`
+	Download struct {
+		Repo []string `arg:"" optional:""`
+	} `cmd:"" aliases:"dl" help:"Download releases from GitHub."`
+	Config struct {
+	} `cmd:"" help:"Configure gh2."`
 }
 
 func Run() error {
-	return app.Run(os.Args)
+	baseConfig, err := core.LoadConfig()
+	if err != nil {
+		return err
+	}
+
+	ctx := kong.Parse(&CLI, kong.UsageOnError())
+
+	if CLI.Debug {
+		slog.SetLogLoggerLevel(slog.LevelDebug)
+	}
+
+	switch ctx.Command() {
+
+	case "clone <repo>":
+		for _, repo := range CLI.Clone.Repo {
+			err = cloneCommand(repo, baseConfig.Clone)
+			if err != nil {
+				break
+			}
+		}
+
+	case "download":
+		fallthrough
+	case "download <repo>":
+		err = downloadCommand(CLI.Download.Repo, baseConfig.Download)
+
+	case "config":
+		err = configCommand()
+
+	default:
+		return fmt.Errorf("unknown command: %s", ctx.Command())
+	}
+
+	return err
 }

@@ -3,28 +3,13 @@ package cmd
 import (
 	"fmt"
 	"gh2/core"
+	"log/slog"
 	"os"
 	"sync"
-
-	"github.com/urfave/cli/v2"
 )
 
-var downloadCommand = &cli.Command{
-	Name:      "download",
-	Aliases:   []string{"dl"},
-	Usage:     "Download releases from GitHub",
-	UsageText: "gh2 download [repo] ...",
-	Args:      true,
-	Action:    downloadAction,
-}
-
-func downloadAction(c *cli.Context) error {
-	baseConfig, err := core.LoadConfig()
-
-	if err != nil {
-		return err
-	}
-	config := baseConfig.Download
+func downloadCommand(urls []string, config core.DownloadConfig) error {
+	slog.Debug("downloadCommand", "urls", urls, "config", config)
 
 	// 检查 output 目录是否存在，如果不存在则创建
 	if _, err := os.Stat(config.OutputDir); os.IsNotExist(err) {
@@ -34,33 +19,42 @@ func downloadAction(c *cli.Context) error {
 		}
 	}
 
-	// 首先获取输入数组，如果输入为空则从缓存加载。
+	// 如果输入为空则从缓存加载。
 	// （缓存就是以前输入过的仓库）
 	// 无论是现输入还是从缓存加载，都是不可信任的，需要后续解析。
-	args := c.Args().Slice()
-	if len(args) == 0 {
-		args, err = core.LoadRepos(config.OutputDir)
+	if len(urls) == 0 {
+		tmp, err := core.LoadRepos(config.OutputDir)
 		if err != nil {
 			return err
 		}
-		if len(args) == 0 {
+
+		// 如果仍然为空，则退出
+		if len(tmp) == 0 {
 			return fmt.Errorf("no input")
 		}
-		args, err = core.SurveyCache(args)
+
+		// 否则 survey 交互
+		urls, err = core.SurveyCache(tmp)
 		if err != nil {
 			return err
 		}
 	}
 
-	// 解析输入数组，生成仓库数组
+	slog.Debug("downloadCommand", "urls", urls)
+
+	// 此时 urls 不为空
+	// 解析 urls 获取 repos
 	var repos []core.Repo
-	for _, arg := range args {
-		repo, err := core.ParseRepo(arg)
+	for _, url := range urls {
+		repo, err := core.ParseRepo(url)
 		if err == nil {
 			repos = append(repos, repo)
 		}
 	}
-	// 如果没有仓库，则退出
+
+	slog.Debug("downloadCommand", "repos", repos)
+
+	// 如果没有 repo 则退出
 	if len(repos) == 0 {
 		return fmt.Errorf("no repos found")
 	}
@@ -115,11 +109,13 @@ func downloadAction(c *cli.Context) error {
 	proxies := core.GetProxies(config.Mirrors)
 	proxy := core.TestProxies(proxies)
 
+	slog.Debug("downloadCommand", "proxy", proxy)
+
 	// 下载 assets
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err = core.DownloadAssets(allAssets, config.OutputDir, proxy)
+		err := core.DownloadAssets(allAssets, config.OutputDir, proxy)
 		if err != nil {
 			return
 		}
