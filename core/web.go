@@ -8,12 +8,15 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/vbauerster/mpb/v8"
 	"github.com/vbauerster/mpb/v8/decor"
 )
 
-var client http.Client
+var client = http.Client{
+	Timeout: 30 * time.Second,
+}
 
 // GitHub REST API 请求频繁会被限流，但是携带身份请求可以提高请求频率
 // 这里加一个方法，使用 GitHub CLI 的 api 命令发送请求，获取 releases
