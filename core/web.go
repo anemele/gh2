@@ -8,9 +8,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sync"
-	"time"
 
-	"github.com/briandowns/spinner"
+	"github.com/vbauerster/mpb/v8"
+	"github.com/vbauerster/mpb/v8/decor"
 )
 
 var client http.Client
@@ -62,57 +62,53 @@ func (repo Repo) GetReleases() ([]Release, error) {
 	return getReleases_gh_api(repo)
 }
 
-const workers = 10
+const workerNumber = 10
 
 func DownloadAssets(assets []Asset, dir string, proxy Proxy) error {
 	var wg sync.WaitGroup
 	type empty struct{}
-	var sem = make(chan empty, workers)
-	var done = make(chan bool)
+	var sem = make(chan empty, workerNumber)
+
+	pb := mpb.New(mpb.WithWaitGroup(&wg))
+	wg.Add(len(assets))
 
 	for _, asset := range assets {
-		wg.Add(1)
 		sem <- empty{}
+
+		bar := pb.AddBar(int64(asset.Size),
+			mpb.BarWidth(20),
+			mpb.PrependDecorators(
+				decor.OnComplete(
+					decor.Spinner([]string{}),
+					"✔",
+				),
+				decor.Name(" ["),
+				decor.Elapsed(decor.ET_STYLE_MMSS),
+				decor.Name("]"),
+			),
+			mpb.AppendDecorators(
+				decor.CountersKibiByte("% .2f / % .2f", decor.WC{W: 25}),
+				decor.Name(fmt.Sprintf(" | %s", asset.Name)),
+			),
+		)
+
 		go func(asset Asset, sem chan empty) {
 			defer func() {
 				<-sem
 				wg.Done()
 			}()
-			err := DownloadAsset(asset, dir, proxy)
-			done <- err == nil
+			DownloadAsset(asset, dir, proxy, bar)
 		}(asset, sem)
 	}
 
-	go func() {
-		wg.Wait()
-		close(done)
-	}()
-
-	sp := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
-	sp.Start()
-	defer sp.Stop()
-
-	succ := 0
-	fail := 0
-	sp.Prefix = fmt.Sprintf("Downloading %d assets ", len(assets))
-
-	for ok := range done {
-		if ok {
-			succ++
-		} else {
-			fail++
-		}
-		// \x1b[2K 控制字符：清除当前行
-		sp.Suffix = fmt.Sprintf(" Success: %d | Failure: %d", succ, fail)
-	}
-	sp.FinalMSG = fmt.Sprintf("All: %d | Success: %d | Failure: %d\n", len(assets), succ, fail)
+	pb.Wait()
 
 	return nil
 }
 
 const chunkSize = 1024 * 1024 * 2
 
-func DownloadAsset(asset Asset, dir string, proxy Proxy) error {
+func DownloadAsset(asset Asset, dir string, proxy Proxy, bar *mpb.Bar) error {
 	file, err := os.OpenFile(filepath.Join(dir, asset.Name), os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
@@ -151,6 +147,8 @@ func DownloadAsset(asset Asset, dir string, proxy Proxy) error {
 		if n != int64(end-start+1) {
 			return fmt.Errorf("expected %d, got %d", end-start+1, n)
 		}
+
+		bar.IncrInt64(end - start + 1)
 
 		start = end + 1
 	}
