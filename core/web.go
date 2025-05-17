@@ -3,6 +3,7 @@ package core
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -14,8 +15,22 @@ import (
 	"github.com/vbauerster/mpb/v8/decor"
 )
 
-var client = http.Client{
-	Timeout: 30 * time.Second,
+var transport = &http.Transport{
+	MaxIdleConns:        100,              // 最大空闲连接数
+	MaxIdleConnsPerHost: 10,               // 每个主机的最大空闲连接数
+	IdleConnTimeout:     30 * time.Second, // 空闲连接超时时间
+	DialContext: (&net.Dialer{
+		Timeout:   10 * time.Second, // 连接超时
+		KeepAlive: 30 * time.Second, // 保持连接活跃时间
+	}).DialContext,
+	TLSHandshakeTimeout:   10 * time.Second, // TLS握手超时
+	ResponseHeaderTimeout: 10 * time.Second, // 响应头超时
+}
+
+// 创建HTTP客户端，设置总超时和自定义传输层
+var client = &http.Client{
+	Timeout:   30 * time.Second, // 整个请求的总超时
+	Transport: transport,
 }
 
 // GitHub REST API 请求频繁会被限流，但是携带身份请求可以提高请求频率
