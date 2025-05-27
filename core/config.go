@@ -49,7 +49,11 @@ func LoadConfig() (Config, error) {
 
 	fp, err := os.Open(configFilePath)
 	if err != nil {
-		fmt.Println("config file not found, creating default config")
+		logger.Warn(
+			"config file not found, creating default config",
+			"path", configFilePath,
+			"error", err,
+		)
 		// 如果打开文件出错，可能是不存在，则创建默认配置，并写入文件
 		// 尝试写入文件，如果出错则不理会，直接返回默认配置
 		fp, err = os.OpenFile(configFilePath, os.O_CREATE|os.O_WRONLY, 0644)
@@ -62,7 +66,8 @@ func LoadConfig() (Config, error) {
 		err = toml.NewEncoder(fp).Encode(config)
 		// 如果出错则打印错误，不影响后续
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println("failed to write default config, please check it")
+			logger.Error(err.Error())
 		}
 		return config, nil
 	}
@@ -72,6 +77,7 @@ func LoadConfig() (Config, error) {
 	_, err = decoder.Decode(&config)
 	if err != nil {
 		fmt.Println("failed to parse config file, please check it")
+		logger.Error(err.Error())
 		return DefaultConfig(), err
 	}
 
@@ -89,11 +95,20 @@ func LoadRepos(dir string) ([]string, error) {
 
 	// not exists
 	if _, err := os.Stat(filename); os.IsNotExist(err) {
+		logger.Error(
+			"not found repo cache file",
+			"path", filename,
+		)
 		return nil, nil
 	}
 
 	fp, err := os.Open(filename)
 	if err != nil {
+		logger.Error(
+			"failed to open repo cache file",
+			"path", filename,
+			"error", err,
+		)
 		return nil, err
 	}
 	defer fp.Close()
@@ -101,6 +116,11 @@ func LoadRepos(dir string) ([]string, error) {
 	// read all string from file and split by \n
 	buf, err := io.ReadAll(fp)
 	if err != nil {
+		logger.Error(
+			"failed to read repo cache file",
+			"path", filename,
+			"error", err,
+		)
 		return nil, err
 	}
 	repos := strings.Split(string(buf), "\n")
@@ -113,6 +133,7 @@ func UpdateRepos(dir string, repos []Repo) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	logger.Debug("length of repo cache", "length", len(cache))
 
 	// 使用哈希表去重（用 set 更合适，但是没有标准库支持）
 	type empty struct{}
@@ -120,6 +141,8 @@ func UpdateRepos(dir string, repos []Repo) ([]string, error) {
 	for _, repo := range cache {
 		hashtable[repo] = empty{}
 	}
+
+	logger.Debug("length of repos", "length", len(repos))
 
 	for _, repo := range repos {
 		r := repo.String()
@@ -141,11 +164,27 @@ func UpdateRepos(dir string, repos []Repo) ([]string, error) {
 
 func SaveRepos(dir string, repos []string) error {
 	filename := filepath.Join(dir, repoCacheFileName)
+
 	fp, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
+		logger.Error(
+			"failed to open repo cache file",
+			"path", filename,
+			"error", err,
+		)
 		return err
 	}
 	defer fp.Close()
+
 	_, err = io.WriteString(fp, strings.Join(repos, "\n"))
-	return err
+	if err != nil {
+		logger.Error(
+			"failed to write repo cache file",
+			"path", filename,
+			"error", err,
+		)
+		return err
+	}
+
+	return nil
 }

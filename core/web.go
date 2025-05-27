@@ -115,7 +115,10 @@ func DownloadAssets(assets []Asset, dir string, proxy Proxy) error {
 				<-sem
 				wg.Done()
 			}()
-			DownloadAsset(asset, dir, proxy, bar)
+			err := DownloadAsset(asset, dir, proxy, bar)
+			if err != nil {
+				logger.Error(err.Error())
+			}
 		}(asset, sem)
 	}
 
