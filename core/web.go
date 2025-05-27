@@ -127,30 +127,68 @@ func DownloadAssets(assets []Asset, dir string, proxy Proxy) error {
 	return nil
 }
 
-const chunkSize = 1024 * 1024 * 2
-
 func DownloadAsset(asset Asset, dir string, proxy Proxy, bar *mpb.Bar) error {
+	url := asset.DownloadUrl
+	if proxy != nil {
+		url = proxy(url)
+	}
+
+	// HEAD 检验文件大小是否相符
+	resp, err := client.Head(url)
+	if err != nil {
+		return err
+	}
+	size := resp.ContentLength
+	if size != asset.Size {
+		return fmt.Errorf("mismatched file size: expected %d, got %d", asset.Size, size)
+	}
+
+	// 打开本地文件，准备接收字节流
 	file, err := os.OpenFile(filepath.Join(dir, asset.Name), os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
-	url := asset.DownloadUrl
-	if proxy != nil {
-		url = proxy(url)
+	// 应该优化下载算法，而非简单地分段下载。
+
+	// 如果文件小于 5MB，可以直接全部请求，无需分段。
+	if size <= 1024*1024*5 {
+		resp, err = client.Get(url)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+		n, err := file.ReadFrom(resp.Body)
+		if err != nil {
+			return err
+		}
+		if n != size {
+			return fmt.Errorf("expected %d, got %d", size, n)
+		}
+		bar.IncrInt64(size)
+		return nil
 	}
 
+	// 假设带宽可达 2MBps ，设置基础块大小为 2MB 。
+	// 如果文件大于 5MB，需要分段请求，首次请求的块大小为 2MB 。
+	// 依据请求时间二分法动态调整块大小，找到合适并以此大小进行后续请求。
+	var chunkSize int64 = 1024 * 1024 * 2
+
 	var start int64 = 0
-	for start < asset.Size {
+	for start < size {
 		end := start + chunkSize
-		if end >= asset.Size {
-			end = asset.Size - 1
+		if end >= size {
+			end = size - 1
 		}
+
 		req, err := http.NewRequest("GET", url, nil)
 		if err != nil {
 			return err
 		}
+
+		// Range header 格式为 bytes=start-end
+		// 包含首尾字节
 		req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", start, end))
 		resp, err := client.Do(req)
 		if err != nil {
@@ -165,11 +203,12 @@ func DownloadAsset(asset Asset, dir string, proxy Proxy, bar *mpb.Bar) error {
 		if err != nil {
 			return err
 		}
-		if n != int64(end-start+1) {
-			return fmt.Errorf("expected %d, got %d", end-start+1, n)
+		realChunkSize := end - start + 1
+		if n != realChunkSize {
+			return fmt.Errorf("expected %d, got %d", realChunkSize, n)
 		}
 
-		bar.IncrInt64(end - start + 1)
+		bar.IncrInt64(realChunkSize)
 
 		start = end + 1
 	}
