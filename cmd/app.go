@@ -30,6 +30,8 @@ func Run() error {
 
 	if CLI.Debug {
 		core.InitLogger(slog.LevelDebug)
+	} else {
+		core.InitLogger(slog.LevelInfo)
 	}
 
 	switch ctx.Command() {
