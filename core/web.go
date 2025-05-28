@@ -127,6 +127,34 @@ func DownloadAssets(assets []Asset, dir string, proxy Proxy) error {
 	return nil
 }
 
+// ref: https://zhuanlan.zhihu.com/p/40819486
+func handleNetError(err error) error {
+	netErr, ok := err.(net.Error)
+	if !ok {
+		return nil
+	}
+
+	if netErr.Timeout() {
+		return nil
+	}
+
+	opErr, ok := netErr.(*net.OpError)
+	if !ok {
+		return nil
+	}
+
+	switch opErr.Err.(type) {
+	case *net.DNSError:
+		return err
+	case *os.SyscallError:
+		return err
+	default:
+		return nil
+	}
+}
+
+const oneMegaByte = 1 << 20
+
 func DownloadAsset(asset Asset, dir string, proxy Proxy, bar *mpb.Bar) error {
 	url := asset.DownloadUrl
 	if proxy != nil {
@@ -153,7 +181,7 @@ func DownloadAsset(asset Asset, dir string, proxy Proxy, bar *mpb.Bar) error {
 	// 应该优化下载算法，而非简单地分段下载。
 
 	// 如果文件小于 5MB，可以直接全部请求，无需分段。
-	if size <= 1024*1024*5 {
+	if size <= oneMegaByte*5 {
 		resp, err = client.Get(url)
 		if err != nil {
 			return err
@@ -170,10 +198,16 @@ func DownloadAsset(asset Asset, dir string, proxy Proxy, bar *mpb.Bar) error {
 		return nil
 	}
 
-	// 假设带宽可达 2MBps ，设置基础块大小为 2MB 。
+	// 假设带宽可达 2MB/s ，设置基础块大小为 2MB 。
 	// 如果文件大于 5MB，需要分段请求，首次请求的块大小为 2MB 。
 	// 依据请求时间二分法动态调整块大小，找到合适并以此大小进行后续请求。
-	var chunkSize int64 = 1024 * 1024 * 2
+	var chunkSize int64 = oneMegaByte * 2
+
+	// 上次请求的块增量
+	var lastAccChunkSize int64 = chunkSize
+	// 上次请求的带宽，初始 2MB/s
+	var lastSpeed float64 = oneMegaByte * 2.0
+	var speed float64
 
 	var start int64 = 0
 	for start < size {
@@ -190,10 +224,19 @@ func DownloadAsset(asset Asset, dir string, proxy Proxy, bar *mpb.Bar) error {
 		// Range header 格式为 bytes=start-end
 		// 包含首尾字节
 		req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", start, end))
+
+		// 记录请求到返回的时间
+		beginTime := time.Now()
 		resp, err := client.Do(req)
+		costTime := time.Since(beginTime)
+
 		if err != nil {
-			return err
+			if handleNetError(err) != nil {
+				return err
+			}
+			continue
 		}
+
 		if resp.StatusCode != http.StatusPartialContent {
 			return fmt.Errorf("failed to download asset: %s", resp.Status)
 		}
@@ -211,6 +254,16 @@ func DownloadAsset(asset Asset, dir string, proxy Proxy, bar *mpb.Bar) error {
 		bar.IncrInt64(realChunkSize)
 
 		start = end + 1
+
+		// 调整块大小
+		speed = float64(realChunkSize) / costTime.Seconds()
+		if speed > lastSpeed {
+			chunkSize += lastAccChunkSize
+		} else {
+			chunkSize -= lastAccChunkSize
+			chunkSize = max(chunkSize, oneMegaByte)
+		}
+		lastSpeed = speed
 	}
 
 	return nil
