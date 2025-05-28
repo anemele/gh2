@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -147,9 +148,14 @@ func DownloadAssets(assets []Asset, dir string, proxy Proxy) error {
 	pb.Wait()
 
 	close(fails)
-	fmt.Println(" failed tasks:")
+	var failedTasks []string
 	for fail := range fails {
-		fmt.Println("  ", fail)
+		failedTasks = append(failedTasks, fail)
+	}
+	if len(failedTasks) == 0 {
+		fmt.Println(" all tasks completed")
+	} else {
+		fmt.Println(" failed tasks:\n ", strings.Join(failedTasks, "\n  "))
 	}
 
 	return nil
