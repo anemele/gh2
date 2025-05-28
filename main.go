@@ -17,8 +17,6 @@ func main() {
 		}
 	}()
 
-	core.GetLogger().Info("start")
-
 	if err := cmd.Run(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
