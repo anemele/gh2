@@ -5,11 +5,21 @@ import (
 	"os"
 
 	"gh2/cmd"
+	"gh2/core"
 )
 
 func main() {
-	err := cmd.Run()
-	if err != nil {
+	defer func() {
+		core.GetLogger().Info("exit")
+		if err := core.CloseLogger(); err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+	}()
+
+	core.GetLogger().Info("start")
+
+	if err := cmd.Run(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}

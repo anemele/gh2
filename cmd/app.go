@@ -29,7 +29,7 @@ func Run() error {
 	ctx := kong.Parse(&CLI, kong.UsageOnError())
 
 	if CLI.Debug {
-		slog.SetLogLoggerLevel(slog.LevelDebug)
+		core.InitLogger(slog.LevelDebug)
 	}
 
 	switch ctx.Command() {

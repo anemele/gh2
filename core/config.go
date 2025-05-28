@@ -128,12 +128,14 @@ func LoadRepos(dir string) ([]string, error) {
 }
 
 func UpdateRepos(dir string, repos []Repo) ([]string, error) {
+	logger.Info("update repo cache", "dir", dir, "length of repos", len(repos))
+
 	cache, err := LoadRepos(dir)
 	// 这里一般不会返回 err ，如果返回 err 则直接退出
 	if err != nil {
 		return nil, err
 	}
-	logger.Debug("length of repo cache", "length", len(cache))
+	logger.Debug("get cache", "length of cache", len(cache))
 
 	// 使用哈希表去重（用 set 更合适，但是没有标准库支持）
 	type empty struct{}
@@ -141,8 +143,6 @@ func UpdateRepos(dir string, repos []Repo) ([]string, error) {
 	for _, repo := range cache {
 		hashtable[repo] = empty{}
 	}
-
-	logger.Debug("length of repos", "length", len(repos))
 
 	for _, repo := range repos {
 		r := repo.String()

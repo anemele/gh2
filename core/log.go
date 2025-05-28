@@ -1,22 +1,45 @@
 package core
 
 import (
-	"fmt"
+	"bufio"
 	"log/slog"
 	"os"
-	"time"
 )
 
-var logger *slog.Logger
+var (
+	logger    *slog.Logger
+	logFile   *os.File
+	bufWriter *bufio.Writer
+)
 
-func init() {
-	filename := fmt.Sprintf("log_%s.txt", time.Now().Format("2006-01-02"))
-	file, _ := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-	logger = slog.New(slog.NewTextHandler(
-		file,
+func InitLogger(level slog.Level) {
+	filename := "gh2.log"
+	logFile, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	if err != nil {
+		panic(err)
+	}
+	bufWriter = bufio.NewWriterSize(logFile, 64<<10) // 64KB
+	handler := slog.NewTextHandler(
+		bufWriter,
 		&slog.HandlerOptions{
-			AddSource: true,
-			Level:     slog.LevelDebug,
+			Level: level,
 		},
-	))
+	)
+	logger = slog.New(handler)
+}
+
+func GetLogger() *slog.Logger {
+	return logger
+}
+
+func CloseLogger() error {
+	if bufWriter != nil {
+		if err := bufWriter.Flush(); err != nil {
+			return err
+		}
+	}
+	if logFile != nil {
+		return logFile.Close()
+	}
+	return nil
 }

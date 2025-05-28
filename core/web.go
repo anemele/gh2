@@ -74,15 +74,24 @@ func getReleases_base(repo Repo) ([]Release, error) {
 }
 
 func (repo Repo) GetReleases() ([]Release, error) {
+	logger.Info("get releases with base api", "repo", repo.String())
 	if res, err := getReleases_base(repo); err == nil {
 		return res, nil
 	}
+	logger.Info("base api failed, use gh cli", "repo", repo.String())
 	return getReleases_gh_api(repo)
 }
 
 const workerNumber = 10
 
 func DownloadAssets(assets []Asset, dir string, proxy Proxy) error {
+	logger.Info("download assets", "dir", dir, "length of assets", len(assets))
+	if proxy != nil {
+		logger.Info("use proxy")
+	} else {
+		logger.Info("no proxy")
+	}
+
 	var wg sync.WaitGroup
 	type empty struct{}
 	var sem = make(chan empty, workerNumber)
@@ -118,6 +127,8 @@ func DownloadAssets(assets []Asset, dir string, proxy Proxy) error {
 			err := DownloadAsset(asset, dir, proxy, bar)
 			if err != nil {
 				logger.Error(err.Error())
+			} else {
+				logger.Info("done", "name", asset.Name)
 			}
 		}(asset, sem)
 	}
@@ -156,6 +167,8 @@ func handleNetError(err error) error {
 const oneMegaByte = 1 << 20
 
 func DownloadAsset(asset Asset, dir string, proxy Proxy, bar *mpb.Bar) error {
+	logger.Info("download asset", "name", asset.Name, "size", asset.Size)
+
 	url := asset.DownloadUrl
 	if proxy != nil {
 		url = proxy(url)
