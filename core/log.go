@@ -1,15 +1,12 @@
 package core
 
 import (
-	"bufio"
 	"log/slog"
 	"os"
 )
 
 var (
-	logger    *slog.Logger
-	logFile   *os.File
-	bufWriter *bufio.Writer
+	logger *slog.Logger
 )
 
 func InitLogger(level slog.Level) {
@@ -18,9 +15,8 @@ func InitLogger(level slog.Level) {
 	if err != nil {
 		panic(err)
 	}
-	bufWriter = bufio.NewWriterSize(logFile, 64<<10) // 64KB
 	handler := slog.NewTextHandler(
-		bufWriter,
+		logFile,
 		&slog.HandlerOptions{
 			Level: level,
 		},
@@ -30,16 +26,4 @@ func InitLogger(level slog.Level) {
 
 func GetLogger() *slog.Logger {
 	return logger
-}
-
-func CloseLogger() error {
-	if bufWriter != nil {
-		if err := bufWriter.Flush(); err != nil {
-			return err
-		}
-	}
-	if logFile != nil {
-		return logFile.Close()
-	}
-	return nil
 }

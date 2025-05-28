@@ -93,47 +93,64 @@ func DownloadAssets(assets []Asset, dir string, proxy Proxy) error {
 	}
 
 	var wg sync.WaitGroup
-	type empty struct{}
-	var sem = make(chan empty, workerNumber)
+	sem := make(chan struct{}, workerNumber)
 
 	pb := mpb.New(mpb.WithWaitGroup(&wg))
 	wg.Add(len(assets))
 
-	for _, asset := range assets {
-		sem <- empty{}
+	taskBar := pb.AddBar(
+		int64(len(assets)),
+		mpb.BarWidth(20),
+		mpb.PrependDecorators(
+			decor.Name("Tasks"),
+		),
+		mpb.AppendDecorators(
+			decor.CountersNoUnit("%d/%d", decor.WCSyncWidth),
+		),
+	)
 
-		bar := pb.AddBar(int64(asset.Size),
+	fails := make(chan string, len(assets))
+
+	for _, asset := range assets {
+		sem <- struct{}{}
+
+		bar := pb.AddBar(
+			asset.Size,
 			mpb.BarWidth(20),
 			mpb.PrependDecorators(
-				decor.OnComplete(
-					decor.Spinner([]string{}),
-					"✔",
-				),
-				decor.Name(" ["),
 				decor.Elapsed(decor.ET_STYLE_MMSS),
-				decor.Name("]"),
 			),
 			mpb.AppendDecorators(
 				decor.CountersKibiByte("% .2f / % .2f", decor.WC{W: 25}),
 				decor.Name(fmt.Sprintf(" | %s", asset.Name)),
 			),
+			mpb.BarRemoveOnComplete(),
 		)
 
-		go func(asset Asset, sem chan empty) {
+		go func(asset Asset, bar *mpb.Bar) {
 			defer func() {
+				taskBar.Increment()
 				<-sem
 				wg.Done()
 			}()
 			err := DownloadAsset(asset, dir, proxy, bar)
 			if err != nil {
+				fails <- asset.DownloadUrl
 				logger.Error(err.Error())
+				bar.Abort(true)
 			} else {
 				logger.Info("done", "name", asset.Name)
 			}
-		}(asset, sem)
+		}(asset, bar)
 	}
 
 	pb.Wait()
+
+	close(fails)
+	fmt.Println(" failed tasks:")
+	for fail := range fails {
+		fmt.Println("  ", fail)
+	}
 
 	return nil
 }
