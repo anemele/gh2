@@ -25,24 +25,29 @@ func GetProxies(hosts []string) []Proxy {
 	return proxies
 }
 
+// 任意 asset 的下载链接都可以
+const testUrl = "https://github.com/cli/cli/releases/download/v2.50.0/gh_2.50.0_windows_arm64.zip"
+
 // 获取第一个可用代理
 func TestProxies(proxies []Proxy) Proxy {
-	// 任意 asset 的下载链接都可以
-	url := "https://github.com/cli/cli/releases/download/v2.50.0/gh_2.50.0_windows_arm64.zip"
 	client := &http.Client{}
-	resp, err := client.Head(url)
+	resp, err := client.Head(testUrl)
 	if err == nil && resp.StatusCode == http.StatusOK {
+		logger.Info("default url accessible")
 		return nil
 	}
 
 	for _, proxy := range proxies {
-		url = proxy(url)
+		url := proxy(testUrl)
 		resp, err = client.Head(url)
 		if err != nil || resp.StatusCode != http.StatusOK {
+			logger.Debug("test proxy", "url", url)
 			continue
 		}
+		logger.Info("use proxy", "url", url)
 		return proxy
 	}
 
+	logger.Error("no resource usable")
 	return nil
 }
