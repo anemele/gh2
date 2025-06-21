@@ -1,6 +1,7 @@
 package core
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 )
@@ -29,25 +30,30 @@ func GetProxies(hosts []string) []Proxy {
 const testUrl = "https://github.com/cli/cli/releases/download/v2.50.0/gh_2.50.0_windows_arm64.zip"
 
 // 获取第一个可用代理
-func TestProxies(proxies []Proxy) Proxy {
+func TestProxies(proxies []Proxy) (Proxy, error) {
 	client := &http.Client{}
-	resp, err := client.Head(testUrl)
-	if err == nil && resp.StatusCode == http.StatusOK {
-		logger.Info("default url accessible")
-		return nil
-	}
 
+	// 策略：首先使用代理
 	for _, proxy := range proxies {
 		url := proxy(testUrl)
-		resp, err = client.Head(url)
+		resp, err := client.Head(url)
 		if err != nil || resp.StatusCode != http.StatusOK {
 			logger.Debug("test proxy", "url", url)
 			continue
 		}
 		logger.Info("use proxy", "url", url)
-		return proxy
+		return proxy, nil
+	}
+
+	// 如果没有代理，或者代理都失效了，尝试使用默认链接
+	resp, err := client.Head(testUrl)
+	if err == nil && resp.StatusCode == http.StatusOK {
+		logger.Info("default url accessible")
+
+		// 返回 nil 表示不使用代理
+		return nil, nil
 	}
 
 	logger.Error("no resource usable")
-	return nil
+	return nil, fmt.Errorf("no resource usable")
 }

@@ -107,7 +107,10 @@ func downloadCommand(urls []string, config core.DownloadConfig) error {
 
 	// 获取代理列表
 	proxies := core.GetProxies(config.Mirrors)
-	proxy := core.TestProxies(proxies)
+	proxy, err := core.TestProxies(proxies)
+	if err != nil {
+		return err
+	}
 
 	slog.Debug("downloadCommand", "proxy", proxy)
 
