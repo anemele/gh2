@@ -8,8 +8,6 @@ from survey import routines
 
 from .parser import Repo, parse_url
 
-CONFIG_FILE_PATH = Path("gh2.toml")
-
 logger = logging.getLogger(__name__)
 
 
@@ -30,6 +28,9 @@ class DownloadConfig:
 class Config(DataClassTOMLMixin):
     clone: CloneConfig = field(default_factory=CloneConfig)
     download: DownloadConfig = field(default_factory=DownloadConfig)
+
+
+CONFIG_FILE_PATH = Path("gh2.toml")
 
 
 def load_config() -> Config:
@@ -55,16 +56,7 @@ def survey_cache(repos: Sequence[str]) -> Sequence[str]:
     return selected_repos
 
 
-REPO_CACHE_FILE_PATH = Path("gh-repos")
-
-
 def load_repos(urls: Sequence[str]) -> Sequence[Repo]:
-    """
-    repo cache file format:
-    owner1/name1
-    owner2/name2
-    ...
-    """
     # 输入 url 为空，怎么处理？
     # 加载缓存
     #
@@ -77,21 +69,42 @@ def load_repos(urls: Sequence[str]) -> Sequence[Repo]:
     # https://github.com/AlecAivazis/survey
     # 参考文档 https://survey.readthedocs.io/reference.html
 
-    if len(urls) == 0:
-        if not REPO_CACHE_FILE_PATH.exists():
-            logger.debug("no url input and no cached repo found")
-            return []
-        cached_repos = REPO_CACHE_FILE_PATH.read_text().strip().splitlines()
-        urls = survey_cache(cached_repos)
-        logger.debug("no url input, use cached repo")
+    if len(urls) != 0:
+        repos = [repo for repo in map(parse_url, urls) if repo is not None]
+        if len(repos) > 0:
+            _update_cache(repos)
+        return repos
 
+    cached_repos = _load_cache()
+    if len(cached_repos) == 0:
+        logger.debug("no url input and no cached repo found")
+        return []
+
+    logger.debug("no url input, use cached repo")
+    urls = survey_cache(cached_repos)
     repos = [repo for repo in map(parse_url, urls) if repo is not None]
+
     return repos
 
 
-def update_repos(repos: Sequence[Repo]):
-    cached_repos = load_repos([])
-    new_repos = set(cached_repos).union(repos)
-    new_repos = map(str, new_repos)
+REPO_CACHE_FILE_PATH = Path("gh-repos")
+
+
+# repo cache file format:
+#    owner1/name1
+#    owner2/name2
+#    ...
+def _load_cache() -> Sequence[str]:
+    cache_path = REPO_CACHE_FILE_PATH
+    if not cache_path.exists():
+        logger.debug("no url input and no cached repo found")
+        return []
+    cached_repos = cache_path.read_text().strip().splitlines()
+    return cached_repos
+
+
+def _update_cache(repos: Sequence[Repo]):
+    new_repos = map(str, repos)
+    new_repos = set(new_repos).union(_load_cache())
     new_repos = sorted(new_repos, key=str.lower)
     REPO_CACHE_FILE_PATH.write_text("\n".join(new_repos))
