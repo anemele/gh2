@@ -8,6 +8,7 @@ from .config import load_config, load_repos
 from .logging_config import setup_logging
 
 logger = logging.getLogger(__name__)
+logger.addHandler(logging.StreamHandler())
 
 
 def clone(urls: Sequence[str]) -> None:
