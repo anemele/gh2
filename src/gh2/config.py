@@ -1,13 +1,16 @@
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Sequence
+from typing import Sequence, Set
 
 from mashumaro.mixins.toml import DataClassTOMLMixin
+from survey import routines
 
 from .parser import Repo, parse_url
-from .survey import survey_cache
 
 CONFIG_FILE_PATH = Path("gh2.toml")
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -30,15 +33,29 @@ class Config(DataClassTOMLMixin):
 
 
 def load_config() -> Config:
-    config_file_path = CONFIG_FILE_PATH
+    cfg_path = CONFIG_FILE_PATH
 
-    if not config_file_path.exists():
+    if not cfg_path.exists():
+        logger.info(f"not found {cfg_path}, use default config")
         return Config()
-    content = config_file_path.read_text(encoding="utf-8")
-    return Config.from_toml(content)
+    content = cfg_path.read_text(encoding="utf-8")
+    logger.info(f"use config from {cfg_path}")
+    config = Config.from_toml(content)
+    logger.debug(f"{config=}")
+    return config
 
 
-RepoCacheFileName = Path("gh-repos")
+def survey_cache(repos: Sequence[str]) -> Sequence[str]:
+    indexes: Set[int] = routines.basket(  # type: ignore
+        "select repos: ",
+        options=repos,
+    )
+    selected_repos = [repos[index] for index in indexes]
+
+    return selected_repos
+
+
+REPO_CACHE_FILE_PATH = Path("gh-repos")
 
 
 def load_repos(urls: Sequence[str]) -> Sequence[Repo]:
@@ -61,10 +78,12 @@ def load_repos(urls: Sequence[str]) -> Sequence[Repo]:
     # 参考文档 https://survey.readthedocs.io/reference.html
 
     if len(urls) == 0:
-        if not RepoCacheFileName.exists():
+        if not REPO_CACHE_FILE_PATH.exists():
+            logger.debug("no url input and no cached repo found")
             return []
-        cached_repos = RepoCacheFileName.read_text().strip().splitlines()
+        cached_repos = REPO_CACHE_FILE_PATH.read_text().strip().splitlines()
         urls = survey_cache(cached_repos)
+        logger.debug("no url input, use cached repo")
 
     repos = [repo for repo in map(parse_url, urls) if repo is not None]
     return repos
@@ -75,4 +94,4 @@ def update_repos(repos: Sequence[Repo]):
     new_repos = set(cached_repos).union(repos)
     new_repos = map(str, new_repos)
     new_repos = sorted(new_repos, key=str.lower)
-    RepoCacheFileName.write_text("\n".join(new_repos))
+    REPO_CACHE_FILE_PATH.write_text("\n".join(new_repos))

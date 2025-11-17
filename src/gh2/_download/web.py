@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import subprocess
 from pathlib import Path
 from typing import Callable, Sequence, Tuple
@@ -11,14 +12,16 @@ from fake_useragent import FakeUserAgent
 
 from ..config import DownloadConfig
 from ..parser import Repo
-from ..survey import survey_releases
-from .rest import Asset, Release
+from .rest import Asset, Release, survey_releases
+
+logger = logging.getLogger(__name__)
 
 
 def download_repos(
     repos: Sequence[Repo],
     config: DownloadConfig,
 ):
+    logger.debug("into asyncio runtime")
     asyncio.run(_download_repos(repos, config))
 
 
@@ -35,22 +38,23 @@ async def _download_repos(
         download_tasks = []
         output_dir = Path(config.output_dir)
         proxy = await get_proxy(client, config.mirrors)
+
+        if proxy is None:
+            logger.info("no proxy")
+        else:
+            logger.info(f"proxy={proxy('')}")
+
         for result in results:
             repo, releases = await result
-            assets = survey_releases(repo, releases)
+            logger.info(f"{repo} has {len(releases)} releases")
+            assets = survey_releases(str(repo), releases)
+            logger.info(f"select {len(assets)} assets")
 
             download_tasks.extend(
                 download_asset(client, asset, output_dir, proxy) for asset in assets
             )
 
-        await asyncio.gather(*download_tasks, return_exceptions=True)
-
-
-def _get_releases_gh_api(repo: Repo) -> bytes:
-    url = f"repos/{repo}/releases"
-    cmd = ["gh", "api", url]
-    data = subprocess.run(cmd, capture_output=True).stdout
-    return data
+        await asyncio.gather(*download_tasks)
 
 
 async def get_releases(
@@ -58,10 +62,12 @@ async def get_releases(
     repo: Repo,
 ) -> Tuple[Repo, Sequence[Release]]:
     async with client.get(repo.releases_url) as resp:
-        if resp.status == 200:
+        if resp.ok:
             content = await resp.read()
         else:
-            content = _get_releases_gh_api(repo)
+            logger.info("request failed, use gh cli")
+            cmd = ["gh", "api", f"repos/{repo}/releases"]
+            content = subprocess.run(cmd, capture_output=True).stdout
 
     data = orjson.loads(content)
     ret = map(Release.from_dict, data)
@@ -91,8 +97,10 @@ async def get_proxy(
     test_url = "https://github.com/cli/cli/releases/download/v2.50.0/gh_2.50.0_windows_arm64.zip"
 
     async def test_proxy(client: Session, proxy: Proxy):
+        logger.debug(f"test proxy {proxy('')}")
         async with client.head(proxy(test_url)) as resp:
             resp.raise_for_status()
+        logger.debug(f"proxy in access: {proxy('')}")
         return proxy
 
     tasks = []
@@ -119,8 +127,10 @@ async def download_asset(
     url = asset.browser_download_url
     if proxy is not None:
         url = proxy(url)
-    path = output_dir.joinpath(asset.name)
+    # TODO: multi-parts download, progress bar.
     async with client.get(url) as resp:
         content = await resp.read()
+    path = output_dir.joinpath(asset.name)
     async with aiofiles.open(path, "wb") as fp:
         await fp.write(content)
+    logger.info(f"downloaded {path}")

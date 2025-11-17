@@ -17,8 +17,8 @@ dependencies = [
 ]
 
 [project.scripts]
-ghcl = "gh2.cmd_clone:main"
-ghdl = "gh2.cmd_download:main"
+ghcl = "gh2.cli:main_cl"
+ghdl = "gh2.cli:main_dl"
 
 [build-system]
 requires = ["uv_build>=0.9.9,<0.10.0"]
