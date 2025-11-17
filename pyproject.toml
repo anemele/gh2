@@ -13,7 +13,9 @@ dependencies = [
     "fake-useragent>=2.2.0",
     "mashumaro[orjson,toml]>=3.17",
     "orjson>=3.11.4",
+    "rich>=14.2.0",
     "survey>=5.4.2",
+    "tenacity>=9.1.2",
 ]
 
 [project.scripts]
