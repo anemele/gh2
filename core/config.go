@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 
 	"github.com/BurntSushi/toml"
+	"github.com/adrg/xdg"
 )
 
 type CloneConfig struct {
@@ -27,25 +27,25 @@ type Config struct {
 	Download DownloadConfig `toml:"download"`
 }
 
-func DefaultConfig() Config {
-	return Config{
-		Clone: CloneConfig{
-			OutputDir: ".",
-			MirrorUrl: "https://github.com/",
-			GitConfig: []string{},
-		},
-		Download: DownloadConfig{
-			OutputDir: ".",
-			Mirrors:   []string{},
-		},
-	}
+var defaultConfig = Config{
+	Clone: CloneConfig{
+		OutputDir: ".",
+		MirrorUrl: "https://github.com/",
+		GitConfig: []string{},
+	},
+	Download: DownloadConfig{
+		OutputDir: ".",
+		Mirrors:   []string{},
+	},
 }
 
-func LoadConfig() (Config, error) {
-	config := DefaultConfig()
+func LoadConfig() (cfg *Config, err error) {
+	cfg = &defaultConfig
 
-	homeDir, _ := os.UserHomeDir()
-	configFilePath := filepath.Join(homeDir, ".gh2rc")
+	configFilePath, err := xdg.ConfigFile("gh2/config.toml")
+	if err != nil {
+		return nil, err
+	}
 
 	fp, err := os.Open(configFilePath)
 	if err != nil {
@@ -56,42 +56,40 @@ func LoadConfig() (Config, error) {
 		)
 		// 如果打开文件出错，可能是不存在，则创建默认配置，并写入文件
 		// 尝试写入文件，如果出错则不理会，直接返回默认配置
-		fp, err = os.OpenFile(configFilePath, os.O_CREATE|os.O_WRONLY, 0644)
+		fp, err = os.OpenFile(configFilePath, os.O_CREATE|os.O_WRONLY, 0o644)
 		if err != nil {
-			return config, nil
+			return cfg, nil
 		}
 		defer fp.Close()
 		// 以 TOML 格式写入文件
 		fmt.Println("writing default config to", configFilePath, "please edit it")
-		err = toml.NewEncoder(fp).Encode(config)
+		err = toml.NewEncoder(fp).Encode(cfg)
 		// 如果出错则打印错误，不影响后续
 		if err != nil {
 			fmt.Println("failed to write default config, please check it")
 			logger.Error(err.Error())
 		}
-		return config, nil
+		return cfg, nil
 	}
 	defer fp.Close()
 
 	decoder := toml.NewDecoder(fp)
-	_, err = decoder.Decode(&config)
+	_, err = decoder.Decode(&cfg)
 	if err != nil {
 		fmt.Println("failed to parse config file, please check it")
 		logger.Error(err.Error())
-		return DefaultConfig(), err
+		return &defaultConfig, err
 	}
 
-	return config, nil
+	return cfg, nil
 }
-
-const repoCacheFileName = "gh-repos"
 
 // repo cache file format:
 // owner1/name1
 // owner2/name2
 // ...
-func LoadRepos(dir string) ([]string, error) {
-	filename := filepath.Join(dir, repoCacheFileName)
+func LoadRepos() ([]string, error) {
+	filename := repoCacheFilePath
 
 	// not exists
 	if _, err := os.Stat(filename); os.IsNotExist(err) {
@@ -127,15 +125,19 @@ func LoadRepos(dir string) ([]string, error) {
 	return repos, nil
 }
 
-func UpdateRepos(dir string, repos []Repo) ([]string, error) {
-	logger.Info("update repo cache", "dir", dir, "length of repos", len(repos))
+func UpdateRepos(repos []Repo) ([]string, error) {
+	logger.Info(
+		"update repo cache",
+		"length of repos", len(repos))
 
-	cache, err := LoadRepos(dir)
+	cache, err := LoadRepos()
 	// 这里一般不会返回 err ，如果返回 err 则直接退出
 	if err != nil {
 		return nil, err
 	}
-	logger.Debug("get cache", "length of cache", len(cache))
+	logger.Debug(
+		"get cache",
+		"length of cache", len(cache))
 
 	// 使用哈希表去重（用 set 更合适，但是没有标准库支持）
 	type empty struct{}
@@ -162,10 +164,10 @@ func UpdateRepos(dir string, repos []Repo) ([]string, error) {
 	return cache, nil
 }
 
-func SaveRepos(dir string, repos []string) error {
-	filename := filepath.Join(dir, repoCacheFileName)
+func SaveRepos(repos []string) error {
+	filename := repoCacheFilePath
 
-	fp, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, 0644)
+	fp, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		logger.Error(
 			"failed to open repo cache file",

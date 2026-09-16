@@ -54,7 +54,6 @@ func getReleases_gh_api(repo Repo) ([]Release, error) {
 func getReleases_base(repo Repo) ([]Release, error) {
 	url := getReleasesUrl(repo)
 	resp, err := client.Get(url)
-
 	if err != nil {
 		return nil, err
 	}
@@ -208,7 +207,7 @@ func DownloadAsset(asset Asset, dir string, proxy Proxy, bar *mpb.Bar) error {
 	}
 
 	// 打开本地文件，准备接收字节流
-	file, err := os.OpenFile(filepath.Join(dir, asset.Name), os.O_CREATE|os.O_WRONLY, 0644)
+	file, err := os.OpenFile(filepath.Join(dir, asset.Name), os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		return err
 	}

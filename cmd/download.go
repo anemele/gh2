@@ -1,19 +1,34 @@
-package cmd
+package main
 
 import (
 	"fmt"
-	"gh2/core"
 	"log/slog"
 	"os"
 	"sync"
+
+	"gh2/core"
 )
 
-func downloadCommand(urls []string, config core.DownloadConfig) error {
-	slog.Debug("downloadCommand", "urls", urls, "config", config)
+type DownloadCmd struct {
+	Repo []string `arg:"" optional:""`
+}
+
+func (c DownloadCmd) Run() error {
+	baseConfig, err := core.LoadConfig()
+	if err != nil {
+		return err
+	}
+
+	config := baseConfig.Download
+	urls := c.Repo
+
+	slog.Debug(
+		"downloadCommand",
+		"urls", urls)
 
 	// 检查 output 目录是否存在，如果不存在则创建
 	if _, err := os.Stat(config.OutputDir); os.IsNotExist(err) {
-		err = os.Mkdir(config.OutputDir, 0755)
+		err = os.Mkdir(config.OutputDir, 0o755)
 		if err != nil {
 			return err
 		}
@@ -23,7 +38,7 @@ func downloadCommand(urls []string, config core.DownloadConfig) error {
 	// （缓存就是以前输入过的仓库）
 	// 无论是现输入还是从缓存加载，都是不可信任的，需要后续解析。
 	if len(urls) == 0 {
-		tmp, err := core.LoadRepos(config.OutputDir)
+		tmp, err := core.LoadRepos()
 		if err != nil {
 			return err
 		}
@@ -106,8 +121,7 @@ func downloadCommand(urls []string, config core.DownloadConfig) error {
 	}
 
 	// 获取代理列表
-	proxies := core.GetProxies(config.Mirrors)
-	proxy, err := core.TestProxies(proxies)
+	proxy, err := core.GetProxy(config.Mirrors)
 	if err != nil {
 		return err
 	}
@@ -125,11 +139,11 @@ func downloadCommand(urls []string, config core.DownloadConfig) error {
 	}()
 	wg.Wait()
 
-	cache, err := core.UpdateRepos(config.OutputDir, repos)
+	cache, err := core.UpdateRepos(repos)
 	if err != nil {
 		return err
 	}
-	err = core.SaveRepos(config.OutputDir, cache)
+	err = core.SaveRepos(cache)
 
 	return err
 }

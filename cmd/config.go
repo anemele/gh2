@@ -1,9 +1,11 @@
-package cmd
+package main
 
 import (
 	"fmt"
 )
 
-func configCommand() error {
+type ConfigCmd struct{}
+
+func (c ConfigCmd) Run() error {
 	return fmt.Errorf("TODO: config command")
 }

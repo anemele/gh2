@@ -5,13 +5,11 @@ import (
 	"os"
 )
 
-var (
-	logger *slog.Logger
-)
+var logger *slog.Logger
 
 func InitLogger(level slog.Level) {
-	filename := "gh2.log"
-	logFile, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	filename := logFilePath
+	logFile, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o666)
 	if err != nil {
 		panic(err)
 	}
