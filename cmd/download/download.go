@@ -1,12 +1,12 @@
-package main
+package download
 
 import (
 	"fmt"
-	"log/slog"
 	"os"
 	"sync"
 
-	"gh2/core"
+	cfg "gh2/pkg/config"
+	"gh2/pkg/rest"
 )
 
 type DownloadCmd struct {
@@ -14,7 +14,7 @@ type DownloadCmd struct {
 }
 
 func (c DownloadCmd) Run() error {
-	baseConfig, err := core.LoadConfig()
+	baseConfig, err := cfg.LoadConfig()
 	if err != nil {
 		return err
 	}
@@ -22,7 +22,8 @@ func (c DownloadCmd) Run() error {
 	config := baseConfig.Download
 	urls := c.Repo
 
-	slog.Debug(
+	logger := cfg.GetLogger()
+	logger.Debug(
 		"downloadCommand",
 		"urls", urls)
 
@@ -38,7 +39,7 @@ func (c DownloadCmd) Run() error {
 	// （缓存就是以前输入过的仓库）
 	// 无论是现输入还是从缓存加载，都是不可信任的，需要后续解析。
 	if len(urls) == 0 {
-		tmp, err := core.LoadRepos()
+		tmp, err := cfg.LoadRepos()
 		if err != nil {
 			return err
 		}
@@ -49,25 +50,25 @@ func (c DownloadCmd) Run() error {
 		}
 
 		// 否则 survey 交互
-		urls, err = core.SurveyCache(tmp)
+		urls, err = SurveyCache(tmp)
 		if err != nil {
 			return err
 		}
 	}
 
-	slog.Debug("downloadCommand", "urls", urls)
+	logger.Debug("downloadCommand", "urls", urls)
 
 	// 此时 urls 不为空
 	// 解析 urls 获取 repos
-	var repos []core.Repo
+	var repos []rest.Repo
 	for _, url := range urls {
-		repo, err := core.ParseRepo(url)
+		repo, err := rest.ParseRepo(url)
 		if err == nil {
 			repos = append(repos, repo)
 		}
 	}
 
-	slog.Debug("downloadCommand", "repos", repos)
+	logger.Debug("downloadCommand", "repos", repos)
 
 	// 如果没有 repo 则退出
 	if len(repos) == 0 {
@@ -78,16 +79,16 @@ func (c DownloadCmd) Run() error {
 
 	type Pair struct {
 		err      error
-		repo     core.Repo
-		releases []core.Release
+		repo     rest.Repo
+		releases []rest.Release
 	}
 	// 首先获取所有仓库的 releases
 	pairChan := make(chan Pair, len(repos))
 	wg.Add(len(repos))
 	for _, repo := range repos {
-		go func(repo core.Repo) {
+		go func(repo rest.Repo) {
 			defer wg.Done()
-			releases, err := repo.GetReleases()
+			releases, err := GetReleases(repo)
 			pairChan <- Pair{err, repo, releases}
 		}(repo)
 	}
@@ -99,16 +100,16 @@ func (c DownloadCmd) Run() error {
 	// }()
 
 	// 清空 repos 数组，因为可能部分错误，或者404等
-	repos = []core.Repo{}
+	repos = []rest.Repo{}
 	// 交互选取 assets
-	var allAssets []core.Asset
+	var allAssets []rest.Asset
 	for pair := range pairChan {
 		if pair.err != nil {
 			fmt.Printf("Error on %s: %s\n", pair.repo.String(), pair.err)
 			continue
 		}
 		repos = append(repos, pair.repo)
-		assets, err := core.SurveyReleases(pair.repo, pair.releases)
+		assets, err := SurveyReleases(pair.repo, pair.releases)
 		if err != nil {
 			continue
 		}
@@ -121,29 +122,29 @@ func (c DownloadCmd) Run() error {
 	}
 
 	// 获取代理列表
-	proxy, err := core.GetProxy(config.Mirrors)
+	proxy, err := GetProxy(config.Mirrors)
 	if err != nil {
 		return err
 	}
 
-	slog.Debug("downloadCommand", "proxy", proxy)
+	cfg.GetLogger().Debug("downloadCommand", "proxy", proxy)
 
 	// 下载 assets
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err := core.DownloadAssets(allAssets, config.OutputDir, proxy)
+		err := DownloadAssets(allAssets, config.OutputDir, proxy)
 		if err != nil {
 			return
 		}
 	}()
 	wg.Wait()
 
-	cache, err := core.UpdateRepos(repos)
+	cache, err := cfg.UpdateRepos(repos)
 	if err != nil {
 		return err
 	}
-	err = core.SaveRepos(cache)
+	err = cfg.SaveRepos(cache)
 
 	return err
 }

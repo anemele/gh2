@@ -1,4 +1,4 @@
-package core
+package rest
 
 import (
 	"fmt"
@@ -17,7 +17,8 @@ func (r Repo) String() string {
 }
 
 func ParseRepo(s string) (Repo, error) {
-	pattern1 := regexp.MustCompile(`^(?:https://[\w\.\-]+/)|(?:git@[\w\.\-]+:)`)
+	pattern1 := regexp.MustCompile(
+		`^(?:https://[\w\.\-]+/)|(?:git@[\w\.\-]+:)`)
 
 	i := pattern1.FindStringIndex(s)
 	if i != nil {
@@ -26,11 +27,13 @@ func ParseRepo(s string) (Repo, error) {
 
 	s = strings.TrimPrefix(s, "/")
 
-	pattern2 := regexp.MustCompile(`^([\w-]+)/([\w\.-]+)`)
+	pattern2 := regexp.MustCompile(
+		`^([\w-]+)/([\w\.-]+)`)
 
 	i = pattern2.FindStringIndex(s)
 	if i == nil {
-		return Repo{}, fmt.Errorf("invalid repo: %s", s)
+		return Repo{},
+			fmt.Errorf("invalid repo: %s", s)
 	}
 
 	matches := pattern2.FindStringSubmatch(s)
@@ -47,7 +50,7 @@ func ParseRepo(s string) (Repo, error) {
 	}, nil
 }
 
-func getReleasesUrl(repo Repo) string {
+func GetReleasesUrl(repo Repo) string {
 	return fmt.Sprintf("https://api.github.com/repos/%s/releases", repo.String())
 }
 

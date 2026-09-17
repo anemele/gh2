@@ -1,14 +1,19 @@
-package core
+package download
 
 import (
 	"fmt"
 
+	. "gh2/pkg/rest"
+
 	"github.com/AlecAivazis/survey/v2"
 )
 
-func SurveyReleases(repo Repo, releases []Release) ([]Asset, error) {
+func SurveyReleases(
+	repo Repo,
+	releases []Release,
+) ([]Asset, error) {
 	var releaseTitles []string
-	var releaseTitleMap = make(map[string]Release)
+	releaseTitleMap := make(map[string]Release)
 	for _, release := range releases {
 		title := release.Title()
 		releaseTitles = append(releaseTitles, title)
@@ -16,7 +21,7 @@ func SurveyReleases(repo Repo, releases []Release) ([]Asset, error) {
 	}
 
 	// ask select releases
-	var q1 = &survey.Select{
+	q1 := &survey.Select{
 		Message: fmt.Sprintf("Select release of %s:", repo.String()),
 		Options: releaseTitles,
 	}
@@ -32,7 +37,7 @@ func SurveyReleases(repo Repo, releases []Release) ([]Asset, error) {
 	selectedRelease := releaseTitleMap[selectedReleaseName]
 
 	var assetTitles []string
-	var assetTitleMap = make(map[string]Asset)
+	assetTitleMap := make(map[string]Asset)
 	for _, asset := range selectedRelease.Assets {
 		title := asset.Title()
 		assetTitles = append(assetTitles, title)
@@ -40,7 +45,7 @@ func SurveyReleases(repo Repo, releases []Release) ([]Asset, error) {
 	}
 
 	// ask select assets
-	var q2 = &survey.MultiSelect{
+	q2 := &survey.MultiSelect{
 		Message: fmt.Sprintf("Select assets (%d):", len(assetTitles)),
 		Options: assetTitles,
 	}
@@ -63,7 +68,7 @@ func SurveyReleases(repo Repo, releases []Release) ([]Asset, error) {
 
 func SurveyCache(repos []string) ([]string, error) {
 	// ask select repos
-	var q1 = &survey.MultiSelect{
+	q1 := &survey.MultiSelect{
 		Message: "Select repos:",
 		Options: repos,
 	}

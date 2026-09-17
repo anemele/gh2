@@ -1,4 +1,4 @@
-package core
+package download
 
 import (
 	"encoding/json"
@@ -11,6 +11,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	cfg "gh2/pkg/config"
+	. "gh2/pkg/rest"
 
 	"github.com/vbauerster/mpb/v8"
 	"github.com/vbauerster/mpb/v8/decor"
@@ -36,7 +39,10 @@ var client = &http.Client{
 
 // GitHub REST API 请求频繁会被限流，但是携带身份请求可以提高请求频率
 // 这里加一个方法，使用 GitHub CLI 的 api 命令发送请求，获取 releases
-func getReleases_gh_api(repo Repo) ([]Release, error) {
+func getReleases_gh_api(
+	repo Repo) (
+	[]Release, error,
+) {
 	url := fmt.Sprintf("repos/%s/releases", repo.String())
 	cmd := exec.Command("gh", "api", url)
 	resp, err := cmd.Output()
@@ -52,7 +58,7 @@ func getReleases_gh_api(repo Repo) ([]Release, error) {
 }
 
 func getReleases_base(repo Repo) ([]Release, error) {
-	url := getReleasesUrl(repo)
+	url := GetReleasesUrl(repo)
 	resp, err := client.Get(url)
 	if err != nil {
 		return nil, err
@@ -73,7 +79,8 @@ func getReleases_base(repo Repo) ([]Release, error) {
 	return releases, nil
 }
 
-func (repo Repo) GetReleases() ([]Release, error) {
+func GetReleases(repo Repo) ([]Release, error) {
+	logger := cfg.GetLogger()
 	logger.Info("get releases with base api", "repo", repo.String())
 	if res, err := getReleases_base(repo); err == nil {
 		return res, nil
@@ -85,6 +92,7 @@ func (repo Repo) GetReleases() ([]Release, error) {
 const workerNumber = 10
 
 func DownloadAssets(assets []Asset, dir string, proxy Proxy) error {
+	logger := cfg.GetLogger()
 	logger.Info("download assets", "dir", dir, "length of assets", len(assets))
 	if proxy != nil {
 		logger.Info("use proxy")
@@ -189,6 +197,7 @@ func handleNetError(err error) error {
 const oneMegaByte = 1 << 20
 
 func DownloadAsset(asset Asset, dir string, proxy Proxy, bar *mpb.Bar) error {
+	logger := cfg.GetLogger()
 	logger.Info("download asset", "name", asset.Name, "size", asset.Size)
 
 	url := asset.DownloadUrl

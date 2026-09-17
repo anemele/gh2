@@ -1,9 +1,11 @@
-package core
+package download
 
 import (
 	"fmt"
 	"net/http"
 	"strings"
+
+	cfg "gh2/pkg/config"
 )
 
 type Proxy func(url string) string
@@ -32,6 +34,7 @@ func GetProxy(mirrors []string) (Proxy, error) {
 func TestProxies(proxies []Proxy) (Proxy, error) {
 	client := &http.Client{}
 
+	logger := cfg.GetLogger()
 	// 策略：首先使用代理
 	for _, proxy := range proxies {
 		url := proxy(testURL)

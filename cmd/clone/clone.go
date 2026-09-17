@@ -1,15 +1,15 @@
-package main
+package clone
 
 import (
 	"fmt"
 	"io"
-	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
-	"gh2/core"
+	"gh2/pkg/config"
+	"gh2/pkg/rest"
 )
 
 type CloneCmd struct {
@@ -17,23 +17,24 @@ type CloneCmd struct {
 }
 
 func (c CloneCmd) Run() error {
-	baseConfig, err := core.LoadConfig()
+	baseConfig, err := config.LoadConfig()
 	if err != nil {
 		return err
 	}
 
+	logger := config.GetLogger()
 	config := baseConfig.Clone
 	for _, url := range c.Repo {
 		func(url string) error {
-			slog.Debug("cloneCommand",
+			logger.Debug("cloneCommand",
 				"url", url)
 
-			repo, err := core.ParseRepo(url)
+			repo, err := rest.ParseRepo(url)
 			if err != nil {
 				return err
 			}
 
-			slog.Debug("cloneCommand",
+			logger.Debug("cloneCommand",
 				"repo", repo)
 
 			repoURL := fmt.Sprintf("%s%s.git", config.MirrorUrl, repo.String())
@@ -44,7 +45,7 @@ func (c CloneCmd) Run() error {
 			}
 			args = append(args, config.GitConfig...)
 
-			slog.Debug("cloneCommand",
+			logger.Debug("cloneCommand",
 				"cmd", "git "+strings.Join(args, " "))
 
 			cmd := exec.Command("git", args...)

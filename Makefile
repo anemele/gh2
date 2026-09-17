@@ -11,9 +11,7 @@ fmt:
 	go fmt
 
 test:
-	go test ./core/
-
-.PHONY: clean
+	go test ./pkg/rest/
 
 clean:
 	rm -f $(APP_NAME)

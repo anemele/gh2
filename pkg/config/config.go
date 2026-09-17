@@ -1,4 +1,4 @@
-package core
+package config
 
 import (
 	"fmt"
@@ -6,6 +6,8 @@ import (
 	"os"
 	"sort"
 	"strings"
+
+	"gh2/pkg/rest"
 
 	"github.com/BurntSushi/toml"
 	"github.com/adrg/xdg"
@@ -125,7 +127,7 @@ func LoadRepos() ([]string, error) {
 	return repos, nil
 }
 
-func UpdateRepos(repos []Repo) ([]string, error) {
+func UpdateRepos(repos []rest.Repo) ([]string, error) {
 	logger.Info(
 		"update repo cache",
 		"length of repos", len(repos))
