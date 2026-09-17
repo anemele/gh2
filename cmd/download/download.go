@@ -50,7 +50,7 @@ func (c DownloadCmd) Run() error {
 		}
 
 		// 否则 survey 交互
-		urls, err = SurveyCache(tmp)
+		urls, err = SelectCache(tmp)
 		if err != nil {
 			return err
 		}
@@ -109,7 +109,7 @@ func (c DownloadCmd) Run() error {
 			continue
 		}
 		repos = append(repos, pair.repo)
-		assets, err := SurveyReleases(pair.repo, pair.releases)
+		assets, err := SelectReleases(pair.repo, pair.releases)
 		if err != nil {
 			continue
 		}

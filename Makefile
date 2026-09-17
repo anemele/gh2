@@ -8,6 +8,7 @@ build: fmt test
 		./cmd/
 
 fmt:
+	go mod tidy
 	go fmt
 
 test:
