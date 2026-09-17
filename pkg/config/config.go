@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -90,41 +91,37 @@ func LoadConfig() (cfg *Config, err error) {
 // owner1/name1
 // owner2/name2
 // ...
-func LoadRepos() ([]string, error) {
+func LoadRepos() (repos []string, err error) {
 	filename := repoCacheFilePath
 
 	// not exists
-	if _, err := os.Stat(filename); os.IsNotExist(err) {
+	if _, err = os.Stat(filename); os.IsNotExist(err) {
 		logger.Error(
 			"not found repo cache file",
 			"path", filename,
 		)
-		return nil, nil
+		return
 	}
 
-	fp, err := os.Open(filename)
-	if err != nil {
-		logger.Error(
-			"failed to open repo cache file",
-			"path", filename,
-			"error", err,
-		)
-		return nil, err
-	}
-	defer fp.Close()
-
-	// read all string from file and split by \n
-	buf, err := io.ReadAll(fp)
+	buf, err := os.ReadFile(filename)
 	if err != nil {
 		logger.Error(
 			"failed to read repo cache file",
 			"path", filename,
 			"error", err,
 		)
-		return nil, err
+		return
 	}
-	repos := strings.Split(string(buf), "\n")
-	return repos, nil
+
+	buf = bytes.TrimSpace(buf)
+	buf = bytes.ReplaceAll(buf, []byte("\r\n"), []byte("\n"))
+	bs := bytes.SplitSeq(buf, []byte("\n"))
+
+	for b := range bs {
+		repos = append(repos, string(b))
+	}
+
+	return
 }
 
 func UpdateRepos(repos []rest.Repo) ([]string, error) {

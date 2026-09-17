@@ -108,12 +108,20 @@ func (c DownloadCmd) Run() error {
 			fmt.Printf("Error on %s: %s\n", pair.repo.String(), pair.err)
 			continue
 		}
+
 		repos = append(repos, pair.repo)
-		assets, err := SelectReleases(pair.repo, pair.releases)
+		releases, err := SelectReleases(pair.repo, pair.releases)
 		if err != nil {
 			continue
 		}
-		allAssets = append(allAssets, assets...)
+
+		for _, release := range releases {
+			assets, err := SelectAssets(*release)
+			if err != nil {
+				continue
+			}
+			allAssets = append(allAssets, assets...)
+		}
 	}
 
 	// 如果没有 assets，则退出
@@ -127,17 +135,17 @@ func (c DownloadCmd) Run() error {
 		return err
 	}
 
-	cfg.GetLogger().Debug("downloadCommand", "proxy", proxy)
+	logger.Debug("downloadCommand", "proxy", proxy)
 
 	// 下载 assets
 	wg.Add(1)
-	go func() {
+	wg.Go(func() {
 		defer wg.Done()
 		err := DownloadAssets(allAssets, config.OutputDir, proxy)
 		if err != nil {
 			return
 		}
-	}()
+	})
 	wg.Wait()
 
 	cache, err := cfg.UpdateRepos(repos)
